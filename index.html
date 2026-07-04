@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SupplyNow · Cart Labels</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#0E1419; --panel:#161F27; --panel2:#1B2730; --line:#2A3742;
+    --txt:#E8EEF2; --dim:#8A9BA8; --faint:#5C6E7B;
+    --frost:#35D0C0; --frost-d:#1FB3A4;
+    --delivery:#3B82F6; --pickup:#D6409A; --amber:#F5B544;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:#05090c;color:var(--txt);font-family:var(--sans)}
+  body{min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+  /* phone shell — constrains the whole app to a true mobile column */
+  #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--ink);position:relative}
+  @media(min-width:520px){
+    #app{margin:22px auto;min-height:calc(100vh - 44px);border:1px solid var(--line);
+      border-radius:34px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input{font-family:inherit}
+  ::selection{background:var(--frost);color:#04201d}
+
+  /* ---------- top bar ---------- */
+  .topbar{position:sticky;top:0;z-index:40;background:rgba(14,20,25,.92);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;padding:14px 16px calc(14px);}
+  .mark{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.06em;font-size:13px}
+  .mark .dot{width:11px;height:11px;border-radius:3px;background:var(--frost);
+    box-shadow:0 0 14px var(--frost);transform:rotate(45deg)}
+  .mark small{color:var(--dim);font-weight:600;letter-spacing:.16em}
+  .spacer{flex:1}
+  .datechip{display:flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line);border-radius:11px;padding:8px 11px;font-size:13px}
+  .datechip label{color:var(--faint);font-size:10px;letter-spacing:.14em;font-weight:700;text-transform:uppercase}
+  .datechip input{background:none;border:none;color:var(--txt);font-family:var(--mono);
+    font-size:13px;outline:none;width:118px}
+  .datechip input::-webkit-calendar-picker-indicator{filter:invert(.7);cursor:pointer}
+
+  .wrap{max-width:430px;margin:0 auto;padding:20px 16px 120px}
+
+  /* ---------- screen 1: locations ---------- */
+  .eyebrow{color:var(--frost);font-size:11px;letter-spacing:.22em;font-weight:700;
+    text-transform:uppercase;margin:8px 2px 4px}
+  h1{font-size:27px;line-height:1.08;letter-spacing:-.02em;margin:0 0 4px;font-weight:800}
+  .sub{color:var(--dim);font-size:14px;margin:0 2px 20px}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+  .tile{position:relative;text-align:left;background:var(--panel);border:1px solid var(--line);
+    border-radius:16px;padding:16px 15px 14px;transition:.14s;overflow:hidden}
+  .tile:active{transform:scale(.975)}
+  .tile:hover{border-color:#3a4b58;background:var(--panel2)}
+  .tile .city{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-bottom:2px}
+  .tile .st{color:var(--faint);font-size:11px;font-family:var(--mono);letter-spacing:.04em;margin-bottom:14px}
+  .tile .stats{display:flex;align-items:baseline;gap:4px;font-family:var(--mono)}
+  .tile .ord{font-size:22px;font-weight:700;color:var(--txt)}
+  .tile .ordlbl{font-size:11px;color:var(--dim)}
+  .tile .amt{margin-left:auto;font-size:13px;color:var(--frost);font-weight:600}
+  .tile .bar{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--frost);opacity:.0;transition:.14s}
+  .tile:hover .bar{opacity:1}
+  .tile.empty .ord{color:var(--faint)}
+
+  /* ---------- screen 2: order list ---------- */
+  .lhead{display:flex;align-items:center;gap:10px;margin:2px 0 14px}
+  .back{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--dim)}
+  .back:hover{color:var(--txt)}
+  .lhead .ltitle{font-size:21px;font-weight:800;letter-spacing:-.01em}
+  .lhead .lcount{color:var(--faint);font-family:var(--mono);font-size:12px}
+
+  .search{position:relative;margin-bottom:12px}
+  .search input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:13px;
+    padding:14px 14px 14px 42px;color:var(--txt);font-size:15px;outline:none;transition:.14s}
+  .search input:focus{border-color:var(--frost);background:var(--panel2)}
+  .search input::placeholder{color:var(--faint)}
+  .search .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:16px}
+
+  .controls{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:3px}
+  .seg button{padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;color:var(--dim);letter-spacing:.02em}
+  .seg button.on{background:var(--frost);color:#04201d}
+  .seglbl{color:var(--faint);font-size:10px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;margin-right:2px}
+  .selall{margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:8px 12px;font-size:12px;font-weight:700;color:var(--frost)}
+  .selall:hover{background:var(--panel2)}
+
+  .card{display:flex;align-items:stretch;gap:0;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;margin-bottom:9px;overflow:hidden;transition:.12s}
+  .card.sel{border-color:var(--frost);background:#16242a;box-shadow:0 0 0 1px var(--frost) inset}
+  .card .stripe{width:5px;flex:none}
+  .card .pick{flex:1;display:flex;align-items:center;gap:12px;padding:13px 13px 13px 12px;text-align:left;min-width:0}
+  .chk{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);flex:none;
+    display:flex;align-items:center;justify-content:center;color:#04201d;font-weight:900;font-size:14px;transition:.12s}
+  .card.sel .chk{background:var(--frost);border-color:var(--frost)}
+  .meta{min-width:0;flex:1}
+  .meta .top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+  .win{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap}
+  .typetag{font-size:9px;font-weight:800;letter-spacing:.1em;padding:2px 6px;border-radius:5px}
+  .typetag.d{color:#cfe0ff;background:rgba(59,130,246,.16)}
+  .typetag.p{color:#ffd2ec;background:rgba(214,64,158,.16)}
+  .meta .acct{font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta .line2{display:flex;gap:8px;align-items:center;color:var(--dim);font-size:12px;margin-top:1px}
+  .meta .ordno{font-family:var(--mono)}
+  .meta .ordno b{color:var(--frost)}
+  .amtcol{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding:0 12px;
+    border-left:1px solid var(--line);min-width:84px}
+  .amtcol .v{font-family:var(--mono);font-size:14px;font-weight:700}
+  .amtcol .l{font-size:9px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase}
+  .stepper{display:flex;align-items:center;gap:0;border-left:1px solid var(--line)}
+  .stepper button{width:34px;height:100%;min-height:60px;font-size:18px;font-weight:700;color:var(--frost)}
+  .stepper button:active{background:var(--panel2)}
+  .stepper .ct{width:30px;text-align:center;font-family:var(--mono);font-weight:700;font-size:15px}
+  .stepper .ct small{display:block;font-size:8px;color:var(--faint);letter-spacing:.08em}
+
+  .nomatch{background:var(--panel);border:1px dashed var(--frost-d);border-radius:14px;padding:18px;margin:6px 0 9px}
+  .nomatch p{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.45}
+  .nomatch b{color:var(--txt)}
+  .genbtn{width:100%;background:var(--frost);color:#04201d;font-weight:800;border-radius:11px;padding:13px;font-size:14px;letter-spacing:.01em}
+
+  .empty-list{text-align:center;color:var(--faint);padding:50px 20px;font-size:14px}
+  .loadstate{grid-column:1/-1;text-align:center;color:var(--dim);padding:44px 20px;font-size:14px;line-height:1.6}
+  .loadstate.err{color:var(--amber)}
+  .loadstate .retry{display:inline-block;margin-top:12px;background:var(--frost);color:#04201d;
+    font-weight:800;border-radius:10px;padding:10px 18px;font-size:13px}
+
+  /* ---------- footer action ---------- */
+  .actionbar{position:sticky;bottom:0;z-index:45;
+    background:linear-gradient(180deg,rgba(14,20,25,0),var(--ink) 32%);padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+  .actionbar .inner{max-width:430px;margin:0 auto}
+  .genlabels{width:100%;background:var(--frost);color:#04201d;font-weight:800;font-size:16px;
+    border-radius:14px;padding:16px;letter-spacing:.01em;display:flex;align-items:center;justify-content:center;gap:10px;
+    box-shadow:0 8px 30px rgba(53,208,192,.28);transition:.12s}
+  .genlabels:active{transform:translateY(1px)}
+  .genlabels:disabled{background:var(--panel);color:var(--faint);box-shadow:none}
+  .genlabels .pill{background:rgba(4,32,29,.22);border-radius:20px;padding:2px 9px;font-family:var(--mono);font-size:13px}
+
+  /* ---------- modal / sheet ---------- */
+  .scrim{position:fixed;inset:0;z-index:60;background:rgba(6,10,13,.72);backdrop-filter:blur(3px);
+    display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:.18s}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet{width:100%;max-width:430px;background:var(--panel);border:1px solid var(--line);
+    border-radius:20px 20px 0 0;padding:8px 18px calc(20px + env(safe-area-inset-bottom));transform:translateY(20px);transition:.18s}
+  .scrim.on .sheet{transform:none}
+  .grab{width:40px;height:4px;border-radius:3px;background:var(--line);margin:8px auto 14px}
+  .sheet h2{font-size:18px;margin:0 0 3px;font-weight:800}
+  .sheet .shsub{color:var(--dim);font-size:13px;margin:0 0 16px}
+  .conf-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
+  .conf-row .nm{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conf-row .nm small{display:block;color:var(--faint);font-family:var(--mono);font-size:11px}
+  .conf-row .carts{font-family:var(--mono);color:var(--dim);font-size:13px}
+  .conf-row .cstep{margin-left:auto;display:flex;align-items:center;background:var(--ink);
+    border:1px solid var(--line);border-radius:11px;flex:none}
+  .conf-row .cstep button{width:40px;height:42px;font-size:22px;font-weight:700;color:var(--frost)}
+  .conf-row .cstep button:active{background:var(--panel2)}
+  .conf-row .cstep .v{width:42px;text-align:center;font-family:var(--mono);font-size:18px;font-weight:800}
+  .total{display:flex;align-items:center;justify-content:space-between;margin:16px 0;
+    padding:16px;background:var(--ink);border:1px solid var(--line);border-radius:14px}
+  .total .l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .total .n{font-family:var(--mono);font-size:32px;font-weight:800;color:var(--frost)}
+  .countinput{display:flex;align-items:center;gap:12px;margin:6px 0 18px}
+  .countinput .lab{font-size:14px;color:var(--dim)}
+  .bigstep{display:flex;align-items:center;gap:0;margin-left:auto;background:var(--ink);border:1px solid var(--line);border-radius:12px}
+  .bigstep button{width:48px;height:48px;font-size:24px;font-weight:700;color:var(--frost)}
+  .bigstep .v{width:54px;text-align:center;font-family:var(--mono);font-size:22px;font-weight:800}
+  .sheet-actions{display:flex;gap:10px}
+  .btn-ghost{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:15px;font-weight:700;color:var(--dim)}
+  .btn-go{flex:2;background:var(--frost);color:#04201d;border-radius:13px;padding:15px;font-weight:800;font-size:15px}
+
+  /* ---------- preview screen ---------- */
+  .pvbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .pvbar .ttl{font-size:20px;font-weight:800}
+  .pvbar .ct{font-family:var(--mono);color:var(--faint);font-size:12px}
+  .printbtn{margin-left:auto;background:var(--frost);color:#04201d;font-weight:800;border-radius:12px;
+    padding:13px 20px;font-size:15px;display:flex;align-items:center;gap:8px;box-shadow:0 6px 22px rgba(53,208,192,.25)}
+  .pvgrid{display:flex;flex-direction:column;gap:18px;align-items:center}
+  .pvwrap{overflow:hidden;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+
+  /* ---------- the 4x6 label (576 x 384 px == 6in x 4in @96dpi, landscape) ---------- */
+  .label{width:576px;height:384px;background:#fff;color:#000;position:relative;
+    font-family:var(--sans);overflow:hidden;display:flex;flex-direction:column}
+  .label .lhdr{display:flex;align-items:stretch;color:#fff}
+  .label .lhdr.d{background:#1f5fce}
+  .label .lhdr.p{background:#b5247f}
+  .label .lhdr.g{background:#0E1419}
+  .label .lhdr .ltype{font-size:30px;font-weight:900;letter-spacing:.04em;padding:14px 18px;line-height:1}
+  .label .lhdr .lwin{margin-left:auto;text-align:right;padding:12px 18px;line-height:1.1}
+  .label .lhdr .lwin .w{font-family:var(--mono);font-size:21px;font-weight:800}
+  .label .lhdr .lwin .dt{font-family:var(--mono);font-size:12px;opacity:.85}
+  .label .lbody{flex:1;display:flex;padding:14px 18px 0;gap:14px;min-height:0}
+  .label .linfo{flex:1;min-width:0}
+  .label .lacct{font-size:34px;font-weight:900;letter-spacing:-.02em;line-height:1.02;
+    margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .label .lcity{font-size:18px;font-weight:700;color:#222;margin-bottom:12px}
+  .label .lrow{display:flex;gap:22px;margin-bottom:9px}
+  .label .lfield .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#777;font-weight:800}
+  .label .lfield .v{font-family:var(--mono);font-size:19px;font-weight:800}
+  .label .lcart .v{font-size:23px}
+  .label .lcodes{width:128px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .label .qrbox{width:118px;height:118px;display:flex;align-items:center;justify-content:center}
+  .label .qrbox img,.label .qrbox canvas{width:118px!important;height:118px!important}
+  .label .ordtag{font-family:var(--mono);font-size:11px;font-weight:700;color:#000;text-align:center;letter-spacing:.02em}
+  .label .ordtag b{font-size:14px}
+  .label .lbar{padding:6px 18px 2px}
+  .label .lbar svg{width:100%;height:46px;display:block}
+  .label .lfoot{background:#000;color:#fff;display:flex;align-items:center;gap:9px;
+    padding:9px 18px;font-size:14px;font-weight:800;letter-spacing:.02em}
+  .label .lfoot .ck{width:20px;height:20px;border:2px solid #fff;border-radius:4px;display:flex;
+    align-items:center;justify-content:center;font-size:13px;flex:none}
+  .label.generic .lacct{font-size:40px}
+
+  .hint{color:var(--faint);font-size:12px;text-align:center;margin:14px auto 0;max-width:440px;line-height:1.5}
+  .hidden{display:none!important}
+
+  /* ---------- print ---------- */
+  @media print{
+    @page{size:6in 4in;margin:0}
+    html,body{background:#fff}
+    body *{visibility:hidden}
+    #printArea,#printArea *{visibility:visible}
+    #printArea{position:absolute;left:0;top:0;width:auto}
+    .pvwrap{box-shadow:none!important;border-radius:0!important;transform:none!important}
+    .pvgrid{gap:0;display:block}
+    .label{transform:none!important;page-break-after:always;break-after:page}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+<div class="topbar">
+  <div class="mark"><span class="dot"></span>SUPPLYNOW <small>CART LABELS</small></div>
+  <div class="spacer"></div>
+  <div class="datechip">
+    <label for="date">Date</label>
+    <input type="date" id="date" />
+  </div>
+</div>
+
+<!-- SCREEN 1 -->
+<div id="screenLoc" class="wrap">
+  <div class="eyebrow">On-demand label printing</div>
+  <h1>Pick your location</h1>
+  <p class="sub">Tap your depot to pull today's orders. Print only the labels you need.</p>
+  <div class="grid" id="locGrid"></div>
+</div>
+
+<!-- SCREEN 2 -->
+<div id="screenList" class="wrap hidden">
+  <div class="lhead">
+    <button class="back" onclick="toLocations()">‹ Back</button>
+    <div>
+      <div class="ltitle" id="listTitle">—</div>
+      <div class="lcount" id="listCount">—</div>
+    </div>
+  </div>
+
+  <div class="search">
+    <span class="ic">⌕</span>
+    <input id="searchInput" type="text" placeholder="Search customer or account…" autocomplete="off" />
+  </div>
+
+  <div class="controls">
+    <span class="seglbl">Sort</span>
+    <div class="seg" id="sortSeg">
+      <button data-sort="time" class="on">Delivery time</button>
+      <button data-sort="amt">Order $</button>
+    </div>
+    <button class="selall" id="selAll" onclick="toggleAll()">Select all</button>
+  </div>
+
+  <div id="orderList"></div>
+</div>
+
+<!-- SCREEN 3 -->
+<div id="screenPreview" class="wrap hidden">
+  <div class="pvbar">
+    <button class="back" onclick="backToList()">‹ Back</button>
+    <div>
+      <div class="ttl">Labels ready</div>
+      <div class="ct" id="pvCount">—</div>
+    </div>
+    <button class="printbtn" onclick="window.print()">⎙ Print 4×6</button>
+  </div>
+  <div class="pvgrid" id="printArea"></div>
+  <p class="hint">Print to your 4×6 thermal printer (landscape). On phone, "Print" → AirPrint or Save as PDF. Every label carries the review-paperwork reminder.</p>
+</div>
+
+<!-- FOOTER ACTION -->
+<div class="actionbar hidden" id="actionBar">
+  <div class="inner">
+    <button class="genlabels" id="genBtn" onclick="openConfirm()" disabled>
+      Generate labels <span class="pill" id="genPill">0</span>
+    </button>
+  </div>
+</div>
+
+<!-- CONFIRM SHEET -->
+<div class="scrim" id="confirmScrim">
+  <div class="sheet" id="confirmSheet"></div>
+</div>
+</div><!-- /#app -->
+
+<script>
+/* ----------------------------- data ----------------------------- */
+// demo depot list — only used in fallback mode. When live, the feed is authoritative.
+const DEMO_LOCATIONS = [
+  {key:"cleveland",city:"Cleveland",st:"OH"},
+  {key:"pittsburgh",city:"Pittsburgh",st:"PA"},
+  {key:"wilkes",city:"Wilkes-Barre",st:"PA"},
+  {key:"columbus",city:"Columbus",st:"OH"},
+  {key:"dearborn",city:"Dearborn",st:"MI"},
+  {key:"ypsilanti",city:"Ypsilanti",st:"MI"},
+  {key:"indianapolis",city:"Indianapolis",st:"IN"},
+  {key:"troy",city:"Troy",st:"MI"},
+  {key:"akron",city:"Akron",st:"OH"},
+];
+let LOCATIONS = DEMO_LOCATIONS.slice();   // active depot list (replaced by the feed when live)
+
+// fallback demo orders — used only when no live endpoint is configured or the fetch fails
+const MOCK_ORDERS = {
+  cleveland:[
+    o("100488","Tremont Tap House","Cleveland","Delivery","6:30 AM",390,2480.55,4),
+    o("100491","Lola Bistro","Cleveland","Delivery","7:00 AM",420,1890.10,3),
+    o("100495","Edison's Pub","Lakewood","Delivery","7:45 AM",465,640.00,1),
+    o("100502","Banter Cleveland","Ohio City","Pickup","8:15 AM",495,3120.75,5),
+    o("100508","Astoria Cafe","Cleveland","Delivery","9:00 AM",540,910.40,2),
+  ],
+  pittsburgh:[
+    o("100633","Grand Concourse","Pittsburgh","Delivery","6:45 AM",405,2210.00,3),
+    o("100640","Meat & Potatoes","Downtown","Delivery","7:30 AM",450,1340.25,2),
+    o("100644","The Speckled Egg","Pittsburgh","Pickup","8:00 AM",480,560.90,1),
+  ],
+  wilkes:[
+    o("100711","Rodano's","Wilkes-Barre","Delivery","6:15 AM",375,1780.00,3),
+    o("100715","Cafe Toscana","Kingston","Delivery","7:15 AM",435,980.30,2),
+  ],
+  columbus:[
+    o("100802","Hyde Park Grille","Columbus","Delivery","7:00 AM",420,2640.00,4),
+    o("100806","The Pearl","Short North","Delivery","8:30 AM",510,1120.50,2),
+    o("100810","Wolf's Ridge","Columbus","Pickup","9:15 AM",555,720.00,1),
+  ],
+  dearborn:[
+    o("100905","Al Ameer","Dearborn","Delivery","7:30 AM",450,1980.00,3),
+    o("100909","Brome Burgers","Dearborn","Delivery","8:45 AM",525,430.20,1),
+  ],
+  ypsilanti:[
+    o("100944","Sidetrack B&G","Ypsilanti","Delivery","8:00 AM",480,1150.00,2),
+  ],
+  indianapolis:[
+    o("101020","St. Elmo Steak","Indianapolis","Delivery","6:30 AM",390,4310.00,6),
+    o("101025","Bluebeard","Fletcher Place","Delivery","7:45 AM",465,1670.40,3),
+    o("101029","Milktooth","Indianapolis","Pickup","9:00 AM",540,890.00,1),
+  ],
+  troy:[
+    o("101101","Kabin Kruser's","Troy","Delivery","7:15 AM",435,1240.00,2),
+    o("101106","Loccino Grill","Troy","Delivery","8:20 AM",500,2090.80,3),
+  ],
+  akron:[
+    o("101188","Lock 3 Kitchen","Akron","Delivery","7:00 AM",420,760.00,1),
+  ],
+};
+function o(id,acct,city,type,win,startMin,amount,cases){
+  return {id,acct,city,type,win,startMin,amount,cases};
+}
+
+/* ----------------------------- live data config ----------------------------- */
+// Source of truth: the SupplyNow RD Routing Parser workbook, tab "Routing_Date".
+// Sweep 1 (Research All Locations) parses the RD order-confirmation emails from Gmail
+// by date; Sweep 2 (Secondary Completion) enriches Load/fulfillment from each order's CSV.
+// The app reads that tab directly via the Google Sheets gviz endpoint (script-tag, no CORS).
+// Set SHEET_ID:"" to fall back to the demo data above.
+const CONFIG = {
+  // Locked feed: read-only Apps Script web app that returns ONLY label fields (no emails/PII).
+  // Once deployed, paste its /exec URL here — the app uses it and the sheet can go private.
+  FEED_URL:  "https://script.google.com/macros/s/AKfycbwPFGlLlxbPrzO5_DwH3fQrDJGhieWYVdpVm6XrlMil4l8sYJw269vMQFerQtXwtDz1bw/exec",
+  // Fallback: direct sheet read via gviz (used only while FEED_URL is empty).
+  SHEET_ID:  "1P0sNXO_XOylSCtptHXwbvMvxv5BnqXN8AARX2Tkgdjc",
+  ORDERS_TAB:"Routing_Date",
+  DASH_TAB:  "Dash",
+  DATE_RANGE:"B2:B3"          // Dash!B2 holds the date the current batch was parsed for
+};
+
+// live-populated order map (slug -> [orders]); empty until a fetch resolves
+let ORDERS = {};
+let loadStatus = "idle";     // idle | loading | ok | error | mock
+let loadedDate = "";         // MM/DD/YYYY the current Routing_Date batch is for
+
+// stamp a unique key on every order — order numbers can repeat / be blank across rows
+function stampUids(map){
+  const out={};
+  Object.keys(map).forEach(k=>{ out[k]=(map[k]||[]).map((o,i)=>Object.assign({},o,{_uid:k+":"+i})); });
+  return out;
+}
+
+// ---- Google Sheets gviz reader (script-tag JSONP; no CORS, no backend) ----
+function gvizFetch(sheet, range, timeoutMs=20000){
+  return new Promise((resolve,reject)=>{
+    const cb="gviz_"+Math.floor(performance.now()*1000).toString(36);
+    let url="https://docs.google.com/spreadsheets/d/"+CONFIG.SHEET_ID+"/gviz/tq?sheet="+encodeURIComponent(sheet);
+    if(range) url+="&range="+encodeURIComponent(range);
+    url+="&tqx=responseHandler:"+cb;
+    const s=document.createElement("script");
+    let done=false;
+    const cleanup=()=>{try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove();clearTimeout(t);};
+    const t=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error("timeout"));},timeoutMs);
+    window[cb]=data=>{if(done)return;done=true;cleanup();resolve(data);};
+    s.onerror=()=>{if(done)return;done=true;cleanup();reject(new Error("network"));};
+    s.src=url;
+    document.head.appendChild(s);
+  });
+}
+// turn a gviz table into row objects keyed by column label (prefer formatted value)
+function gvizRows(resp){
+  const cols=(resp.table.cols||[]).map(c=>c.label||c.id||"");
+  return (resp.table.rows||[]).map(r=>{
+    const o={};
+    (r.c||[]).forEach((cell,i)=>{ o[cols[i]] = cell==null ? "" : (cell.f!=null?cell.f:(cell.v==null?"":cell.v)); });
+    return o;
+  });
+}
+
+function minutesFromTime(t){
+  const m=String(t||"").match(/(\d{1,2}):(\d{2})\s*([AP]M)?/i);
+  if(!m) return 0;
+  let h=+m[1]%12; if(m[3]&&/PM/i.test(m[3])) h+=12;
+  return h*60 + (+m[2]);
+}
+function minToTime(m){
+  m=+m||0; let h=Math.floor(m/60)%24, mm=m%60;
+  const ap=h>=12?"PM":"AM"; let hh=h%12; if(hh===0) hh=12;
+  return hh+":"+String(mm).padStart(2,"0")+" "+ap;
+}
+function cityFromAddress(a){
+  const p=String(a||"").split(",").map(s=>s.trim()).filter(Boolean);
+  return p[1]||p[0]||"";      // "street, CITY, ST, zip" -> CITY
+}
+// one Routing_Date row -> app order object
+function rowToOrder(row){
+  const id   = String(row["Order Number"]||"").trim();
+  const biz  = String(row["business Name"]||"").trim();
+  const cust = String(row["customer name"]||"").trim();
+  const win  = String(row["Start"]||"").trim();
+  return {
+    id,
+    acct:  biz || cust || "—",
+    city:  cityFromAddress(row["Address"]),
+    type:  /pickup/i.test(String(row["Delivery Type"]||"")) ? "Pickup" : "Delivery",
+    win,
+    startMin: minutesFromTime(win),
+    cases:  Math.round(Number(String(row["Load"]||"").replace(/[^0-9.\-]/g,""))||0),
+    amount: Number(String(row["Order Total"]||"").replace(/[^0-9.\-]/g,""))||0,
+    _tag:  String(row["Fulfillment Tag"]||"").trim(),
+    _st:   String(row["State Code"]||"").trim()
+  };
+}
+function slug(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");}
+
+// group order objects into ORDERS + LOCATIONS by Fulfillment Tag (depot)
+function groupOrders(orders){
+  const byTag={};
+  orders.filter(o=>o.id && o._tag).forEach(o=>{(byTag[o._tag]=byTag[o._tag]||[]).push(o);});
+  const raw={}, locs=[];
+  Object.keys(byTag).forEach(tag=>{
+    const key=slug(tag);
+    raw[key]=byTag[tag];
+    locs.push({key, city:tag, st:byTag[tag][0]._st||""});
+  });
+  ORDERS = stampUids(raw);
+  LOCATIONS = locs.sort((a,b)=>a.city.localeCompare(b.city));
+}
+// from the direct gviz sheet read
+function buildFromRows(rows){ groupOrders(rows.map(rowToOrder)); }
+// from the locked endpoint's {ok,date,orders[]} payload (no PII)
+function buildFromFeed(resp){
+  loadedDate = String(resp.date||"").trim();
+  groupOrders((resp.orders||[]).map(o=>{
+    const sm=Number(o.startMin)||minutesFromTime(o.win);
+    return {
+      id:String(o.id||"").trim(),
+      acct:String(o.acct||"—"),
+      city:String(o.city||""),
+      type:/pickup/i.test(String(o.type||""))?"Pickup":"Delivery",
+      // endpoint returns the raw time cell; derive a clean display time from startMin
+      win: sm>0 ? minToTime(sm) : (/(GMT|18\d\d|\d{4})/.test(String(o.win))?"":String(o.win)),
+      startMin:sm,
+      cases:Number(o.cases)||0,
+      amount:Number(o.amount)||0,
+      _tag:String(o.tag||"").trim(),
+      _st:String(o.st||"").trim()
+    };
+  }));
+}
+
+// plain JSONP fetch (for the locked Apps Script endpoint)
+function jsonp(url, timeoutMs=20000){
+  return new Promise((resolve,reject)=>{
+    const cb="feed_"+Math.floor(performance.now()*1000).toString(36);
+    const sep=url.includes("?")?"&":"?";
+    const s=document.createElement("script");
+    let done=false;
+    const cleanup=()=>{try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove();clearTimeout(t);};
+    const t=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error("timeout"));},timeoutMs);
+    window[cb]=data=>{if(done)return;done=true;cleanup();resolve(data);};
+    s.onerror=()=>{if(done)return;done=true;cleanup();reject(new Error("network"));};
+    s.src=url+sep+"callback="+cb;
+    document.head.appendChild(s);
+  });
+}
+
+// read the current parsed batch (+ which date it's for)
+async function loadOrders(iso){
+  // 1) locked read-only endpoint (preferred; sheet stays private, no PII exposed)
+  if(CONFIG.FEED_URL){
+    loadStatus="loading"; renderLocations();
+    try{
+      const resp=await jsonp(CONFIG.FEED_URL);
+      if(!resp||resp.ok===false) throw new Error((resp&&resp.error)||"bad feed");
+      buildFromFeed(resp); loadStatus="ok";
+    }catch(e){ ORDERS={}; LOCATIONS=[]; loadStatus="error"; console.warn("feed failed:",e); }
+    return;
+  }
+  // 2) direct sheet read via gviz (only while the sheet is still link-readable)
+  if(CONFIG.SHEET_ID){
+    loadStatus="loading"; renderLocations();
+    try{
+      const [ordResp, dashResp] = await Promise.all([
+        gvizFetch(CONFIG.ORDERS_TAB),
+        gvizFetch(CONFIG.DASH_TAB, CONFIG.DATE_RANGE).catch(()=>null)
+      ]);
+      buildFromRows(gvizRows(ordResp));
+      try{
+        const c0 = dashResp && dashResp.table && dashResp.table.rows[0] && dashResp.table.rows[0].c[0];
+        if(c0) loadedDate = String(c0.f||c0.v||"").trim();
+      }catch(e){}
+      loadStatus="ok";
+    }catch(e){ ORDERS={}; LOCATIONS=[]; loadStatus="error"; console.warn("gviz failed:",e); }
+    return;
+  }
+  // 3) demo fallback
+  ORDERS = stampUids(MOCK_ORDERS); LOCATIONS = DEMO_LOCATIONS.slice(); loadStatus="mock";
+}
+
+/* ----------------------------- state ----------------------------- */
+let state = {
+  loc:null,
+  sort:"time",
+  search:"",
+  sel:{},          // id -> cartCount
+  queue:[],        // built labels for preview
+};
+
+/* ----------------------------- helpers ----------------------------- */
+const $=s=>document.querySelector(s);
+const money=n=>"$"+n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+function todayISO(){const d=new Date();return d.toISOString().slice(0,10);}
+function prettyDate(iso){
+  const [y,m,d]=iso.split("-").map(Number);
+  const dt=new Date(y,m-1,d);
+  return dt.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function last4(id){return String(id).slice(-4);}
+// blank obviously-bad city values coming from the routing export (e.g. "opens at 10am")
+function cleanCity(c){c=String(c||"").trim();return /open|^\d|\bam\b|\bpm\b/i.test(c)?"":c;}
+
+/* ----------------------------- screen 1 ----------------------------- */
+function renderLocations(){
+  const g=$("#locGrid");g.innerHTML="";
+  if(loadStatus==="loading"){
+    g.innerHTML=`<div class="loadstate">Pulling today's orders…</div>`;return;
+  }
+  if(loadStatus==="error"){
+    g.innerHTML=`<div class="loadstate err">Couldn't reach the live order feed.<br>
+      <button class="retry" onclick="reload()">Retry</button></div>`;return;
+  }
+  if(LOCATIONS.length===0){
+    g.innerHTML=`<div class="loadstate">No orders loaded${loadedDate?` for ${loadedDate}`:""}.<br>
+      <span style="color:var(--faint);font-size:12px">Run the parser (Research All Locations → Secondary Completion) for this date, then reopen.</span></div>`;return;
+  }
+  LOCATIONS.forEach(L=>{
+    const list=ORDERS[L.key]||[];
+    const tot=list.reduce((a,b)=>a+b.amount,0);
+    const empty=list.length===0;
+    const el=document.createElement("button");
+    el.className="tile"+(empty?" empty":"");
+    el.onclick=()=>openLocation(L.key);
+    el.innerHTML=`<span class="bar"></span>
+      <div class="city">${L.city}</div>
+      <div class="st">${L.st} · ${L.key.toUpperCase()}</div>
+      <div class="stats">
+        <span class="ord">${list.length}</span><span class="ordlbl">orders</span>
+        <span class="amt">${empty?"—":money(tot)}</span>
+      </div>`;
+    g.appendChild(el);
+  });
+}
+
+function openLocation(key){
+  state.loc=key;state.search="";state.sel={};
+  $("#searchInput").value="";
+  const L=LOCATIONS.find(x=>x.key===key);
+  $("#listTitle").textContent=L.city;
+  show("list");
+  renderList();
+}
+function toLocations(){show("loc");}
+
+/* ----------------------------- screen 2 ----------------------------- */
+function sortedOrders(){
+  let arr=(ORDERS[state.loc]||[]).slice();
+  if(state.sort==="time") arr.sort((a,b)=>a.startMin-b.startMin);
+  else arr.sort((a,b)=>b.amount-a.amount);
+  if(state.search.trim()){
+    const q=state.search.toLowerCase();
+    arr=arr.filter(x=>x.acct.toLowerCase().includes(q)||x.city.toLowerCase().includes(q)||x.id.includes(q));
+  }
+  return arr;
+}
+function renderList(){
+  const arr=sortedOrders();
+  const all=(ORDERS[state.loc]||[]);
+  $("#listCount").textContent=`${all.length} orders · ${money(all.reduce((a,b)=>a+b.amount,0))}`;
+  const wrap=$("#orderList");wrap.innerHTML="";
+
+  // escape hatch: no match -> offer generic
+  if(state.search.trim() && arr.length===0){
+    const nm=document.createElement("div");
+    nm.className="nomatch";
+    nm.innerHTML=`<p>No order found for <b>"${escapeHtml(state.search)}"</b>. Print a generic label for this account — it'll ask how many carts.</p>
+      <button class="genbtn" onclick="genericFlow('${escapeAttr(state.search)}')">Print generic label →</button>`;
+    wrap.appendChild(nm);
+  }
+
+  if(arr.length===0 && !state.search.trim()){
+    wrap.innerHTML=`<div class="empty-list">No orders for this location on ${prettyDate($("#date").value)}.</div>`;
+  }
+
+  arr.forEach(ord=>{
+    const sel=state.sel[ord._uid]!==undefined;
+    const d=ord.type==="Delivery";
+    const card=document.createElement("div");
+    card.className="card"+(sel?" sel":"");
+    card.innerHTML=`
+      <div class="stripe" style="background:${d?'var(--delivery)':'var(--pickup)'}"></div>
+      <button class="pick" onclick="toggleSel('${ord._uid}')">
+        <div class="chk">${sel?'✓':''}</div>
+        <div class="meta">
+          <div class="acct">${escapeHtml(ord.acct)}</div>
+          <div class="line2">
+            <span class="win">${ord.win||'—'}</span>
+            <span class="typetag ${d?'d':'p'}">${ord.type.toUpperCase()}</span>
+          </div>
+        </div>
+      </button>`;
+    wrap.appendChild(card);
+  });
+  updateAction();
+  // sync select-all label
+  $("#selAll").textContent = (all.length>0 && all.every(x=>state.sel[x._uid]!==undefined)) ? "Clear all":"Select all";
+}
+
+function toggleSel(uid){
+  if(state.sel[uid]!==undefined){delete state.sel[uid];}
+  else{state.sel[uid]=1;}   // count is chosen after selection, in the confirm sheet
+  renderList();
+}
+function toggleAll(){
+  const all=(ORDERS[state.loc]||[]);
+  const allSel=all.length>0 && all.every(x=>state.sel[x._uid]!==undefined);
+  if(allSel){state.sel={};}
+  else{all.forEach(x=>{if(state.sel[x._uid]===undefined)state.sel[x._uid]=1;});}
+  renderList();
+}
+function findOrder(uid){return (ORDERS[state.loc]||[]).find(x=>x._uid===uid);}
+
+function updateAction(){
+  const ids=Object.keys(state.sel);
+  $("#actionBar").classList.toggle("hidden",ids.length===0);
+  $("#genBtn").disabled=ids.length===0;
+  $("#genPill").textContent=ids.length;
+  $("#genBtn").childNodes[0].nodeValue = ids.length?`Set label count `:`Select orders `;
+}
+
+/* ----------------------------- confirm (ask label count) ----------------------------- */
+function openConfirm(){
+  const ids=Object.keys(state.sel);
+  if(!ids.length)return;
+  const sheet=$("#confirmSheet");
+  let rows="";
+  let total=0;
+  ids.forEach(uid=>{
+    const ord=findOrder(uid);if(!ord)return;const c=state.sel[uid];total+=c;
+    rows+=`<div class="conf-row">
+      <div class="nm">${escapeHtml(ord.acct)}<small>${ord.win||'—'} · ${ord.type}</small></div>
+      <div class="cstep">
+        <button onclick="confBump('${uid}',-1)">–</button>
+        <div class="v" id="cc_${uid}">${c}</div>
+        <button onclick="confBump('${uid}',1)">+</button>
+      </div></div>`;
+  });
+  sheet.innerHTML=`
+    <div class="grab"></div>
+    <h2>How many labels?</h2>
+    <p class="shsub">${ids.length} order${ids.length>1?'s':''} · set the count — each copy prints as one single-label 4×6 page.</p>
+    <div style="max-height:40vh;overflow:auto">${rows}</div>
+    <div class="total"><span class="l">Label pages</span><span class="n" id="confTotal">${total}</span></div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeConfirm()">Back</button>
+      <button class="btn-go" onclick="produce()">Produce · Print</button>
+    </div>`;
+  $("#confirmScrim").classList.add("on");
+}
+function confBump(id,dir){
+  state.sel[id]=Math.max(1,Math.min(50,(state.sel[id]||1)+dir));
+  document.getElementById("cc_"+id).textContent=state.sel[id];
+  const total=Object.keys(state.sel).reduce((a,k)=>a+state.sel[k],0);
+  document.getElementById("confTotal").textContent=total;
+  updateAction();
+}
+function closeConfirm(){$("#confirmScrim").classList.remove("on");}
+
+/* ----------------------------- generic label escape hatch ----------------------------- */
+function genericFlow(name){
+  const sheet=$("#confirmSheet");
+  let carts=1;
+  sheet.innerHTML=`
+    <div class="grab"></div>
+    <h2>Generic label</h2>
+    <p class="shsub">No order on file — printing an account label for <b style="color:var(--txt)">${escapeHtml(name)}</b>.</p>
+    <div class="countinput">
+      <span class="lab">How many carts?</span>
+      <div class="bigstep">
+        <button onclick="gcart(-1)">–</button>
+        <div class="v" id="gcartVal">1</div>
+        <button onclick="gcart(1)">+</button>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-go" onclick="produceGeneric('${escapeAttr(name)}')">Produce label · Print</button>
+    </div>`;
+  window._gcart=1;
+  $("#confirmScrim").classList.add("on");
+}
+function gcart(d){window._gcart=Math.max(1,Math.min(20,(window._gcart||1)+d));$("#gcartVal").textContent=window._gcart;}
+
+/* ----------------------------- build labels ----------------------------- */
+function produce(){
+  const iso=$("#date").value;
+  const ids=Object.keys(state.sel);
+  const labels=[];
+  // keep them in current sort order for predictable printing
+  sortedOrders().forEach(ord=>{
+    if(state.sel[ord._uid]===undefined)return;
+    const tot=state.sel[ord._uid];
+    for(let i=1;i<=tot;i++){
+      labels.push({type:ord.type,acct:ord.acct,city:ord.city,win:ord.win,id:ord.id,
+        cases:ord.cases,cart:i,carts:tot,date:iso,generic:false});
+    }
+  });
+  state.queue=labels;closeConfirm();renderPreview();
+}
+function produceGeneric(name){
+  const iso=$("#date").value;
+  const tot=window._gcart||1;
+  const L=LOCATIONS.find(x=>x.key===state.loc);
+  const labels=[];
+  for(let i=1;i<=tot;i++){
+    labels.push({type:"Account",acct:name,city:(L?L.city:""),win:"",id:"",
+      cases:0,cart:i,carts:tot,date:iso,generic:true});
+  }
+  state.queue=labels;closeConfirm();renderPreview();
+}
+
+function renderPreview(){
+  show("preview");
+  const area=$("#printArea");area.innerHTML="";
+  $("#pvCount").textContent=`${state.queue.length} label${state.queue.length>1?'s':''} · 4×6 landscape`;
+  // viewport scale for faithful preview
+  const container=Math.min(area.clientWidth||520,520);
+  const scale=Math.min(1,(container)/576);
+  state.queue.forEach((lb,idx)=>{
+    const wrap=document.createElement("div");
+    wrap.className="pvwrap";
+    wrap.style.width=(576*scale)+"px";
+    wrap.style.height=(384*scale)+"px";
+    const lab=buildLabel(lb,idx);
+    lab.style.transformOrigin="top left";
+    lab.style.transform="scale("+scale+")";
+    wrap.appendChild(lab);
+    area.appendChild(wrap);
+  });
+  // generate codes after in DOM
+  state.queue.forEach((lb,idx)=>{
+    if(!lb.generic && lb.id){
+      try{JsBarcode("#bc"+idx,lb.id,{format:"CODE128",displayValue:false,margin:0,height:46,width:2});}catch(e){}
+    }
+    const qd=document.getElementById("qr"+idx);
+    if(qd){
+      try{new QRCode(qd,{text:(lb.generic||!lb.id)?("ACCT:"+lb.acct):("SN|"+lb.id+"|"+lb.date),
+        width:118,height:118,correctLevel:QRCode.CorrectLevel.M});}catch(e){qd.innerHTML='<div style="font:700 11px var(--mono);color:#000">QR</div>';}
+    }
+  });
+}
+
+function buildLabel(lb,idx){
+  const el=document.createElement("div");
+  el.className="label"+(lb.generic?" generic":"");
+  const hk=lb.generic?"g":(lb.type==="Delivery"?"d":"p");
+  const typeText=lb.generic?"ACCOUNT":lb.type.toUpperCase();
+
+  let codes,bar,body;
+  if(lb.generic){
+    codes=`<div class="lcodes"><div class="qrbox" id="qr${idx}"></div>
+      <div class="ordtag">GENERIC LABEL</div></div>`;
+    bar="";
+    body=`<div class="lbody">
+        <div class="linfo">
+          <div class="lacct">${escapeHtml(lb.acct)}</div>
+          <div class="lcity">${escapeHtml(lb.city)}</div>
+          <div class="lrow">
+            <div class="lfield lcart"><div class="k">Cart</div><div class="v">${lb.cart} of ${lb.carts}</div></div>
+            <div class="lfield"><div class="k">No order on file</div><div class="v">— —</div></div>
+          </div>
+        </div>${codes}
+      </div>`;
+  }else{
+    const hasOrder=!!lb.id;   // SNAP / hospital stops have no RD order number
+    codes=`<div class="lcodes"><div class="qrbox" id="qr${idx}"></div>
+      <div class="ordtag">${hasOrder?`ORDER #…<b>${last4(lb.id)}</b>`:'NO ORDER #'}</div></div>`;
+    bar=hasOrder?`<div class="lbar"><svg id="bc${idx}"></svg></div>`:'';
+    body=`<div class="lbody">
+        <div class="linfo">
+          <div class="lacct">${escapeHtml(lb.acct)}</div>
+          <div class="lcity">${escapeHtml(cleanCity(lb.city))}</div>
+          <div class="lrow">
+            <div class="lfield lcart"><div class="k">Cart</div><div class="v">${lb.cart} of ${lb.carts}</div></div>
+            <div class="lfield"><div class="k">Cases / Load</div><div class="v">${lb.cases}</div></div>
+            ${hasOrder?`<div class="lfield"><div class="k">Order #</div><div class="v">${lb.id}</div></div>`:''}
+          </div>
+        </div>${codes}
+      </div>`;
+  }
+
+  el.innerHTML=`
+    <div class="lhdr ${hk}">
+      <div class="ltype">${typeText}</div>
+      <div class="lwin">${lb.win?`<div class="w">${lb.win}</div>`:''}<div class="dt">${prettyDate(lb.date)}</div></div>
+    </div>
+    ${body}
+    ${bar}
+    <div class="lfoot"><span class="ck">✓</span> REVIEW FINAL ORDER PAPERWORK BEFORE LEAVING</div>`;
+  return el;
+}
+
+function backToList(){show("list");renderList();}
+
+/* ----------------------------- nav ----------------------------- */
+function show(which){
+  $("#screenLoc").classList.toggle("hidden",which!=="loc");
+  $("#screenList").classList.toggle("hidden",which!=="list");
+  $("#screenPreview").classList.toggle("hidden",which!=="preview");
+  $("#actionBar").classList.toggle("hidden",which!=="list"||Object.keys(state.sel).length===0);
+  window.scrollTo(0,0);
+}
+
+/* ----------------------------- utils ----------------------------- */
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function escapeAttr(s){return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+/* ----------------------------- init ----------------------------- */
+function mdyToISO(s){const m=String(s||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${String(m[1]).padStart(2,"0")}-${String(m[2]).padStart(2,"0")}`:"";}
+
+// read the current parsed batch, then repaint whichever screen is showing
+async function reload(){
+  await loadOrders($("#date").value);
+  if(loadedDate){ const iso=mdyToISO(loadedDate); if(iso) $("#date").value=iso; }  // chip follows the loaded batch
+  renderLocations();
+  if(!$("#screenList").classList.contains("hidden")) renderList();
+}
+
+$("#date").value=todayISO();
+$("#date").addEventListener("change",()=>{ state.sel={}; reload(); });
+$("#searchInput").addEventListener("input",e=>{state.search=e.target.value;renderList();});
+document.querySelectorAll("#sortSeg button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll("#sortSeg button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");state.sort=b.dataset.sort;renderList();
+  });
+});
+$("#confirmScrim").addEventListener("click",e=>{if(e.target.id==="confirmScrim")closeConfirm();});
+reload();
+</script>
+</body>
+</html>
