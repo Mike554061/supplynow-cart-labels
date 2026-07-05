@@ -6,6 +6,8 @@
 <title>SupplyNow · Cart Labels</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     --ink:#0E1419; --panel:#161F27; --panel2:#1B2730; --line:#2A3742;
@@ -209,7 +211,7 @@
   .label .ordtag{font-family:var(--mono);font-size:11px;font-weight:700;color:#000;text-align:center;letter-spacing:.02em}
   .label .ordtag b{font-size:14px}
   .label .lbar{padding:6px 18px 2px}
-  .label .lbar svg{width:100%;height:46px;display:block}
+  .label .lbar svg,.label .lbar canvas{width:100%;height:46px;display:block}
   .label .lfoot{background:#000;color:#fff;display:flex;align-items:center;gap:9px;
     padding:9px 18px;font-size:14px;font-weight:800;letter-spacing:.02em}
   .label .lfoot .ck{width:20px;height:20px;border:2px solid #fff;border-radius:4px;display:flex;
@@ -291,10 +293,10 @@
       <div class="ttl">Labels ready</div>
       <div class="ct" id="pvCount">—</div>
     </div>
-    <button class="printbtn" onclick="window.print()">⎙ Print 4×6</button>
+    <button class="printbtn" id="pdfBtn" onclick="downloadPDF()">⎙ Save 4×6 PDF</button>
   </div>
   <div class="pvgrid" id="printArea"></div>
-  <p class="hint">Print to your 4×6 thermal printer (landscape). On phone, "Print" → AirPrint or Save as PDF. Every label carries the review-paperwork reminder.</p>
+  <p class="hint">Tap <b>Save 4×6 PDF</b> to build one file — each label its own exact 6×4in page. Open it and print to your thermal printer (no paper-size or scaling to set). Black &amp; white, thermal-safe.</p>
 </div>
 
 <!-- FOOTER ACTION -->
@@ -814,6 +816,38 @@ function renderPreview(){
   });
 }
 
+/* ----------------------------- build the combined 4x6 PDF -----------------------------
+   Rasterizes each label to its own exact 6x4in landscape page and saves ONE file.
+   Bypasses the browser print dialog entirely — no B5, no scaling, no dropped barcodes. */
+let pdfBusy=false;
+async function downloadPDF(){
+  if(pdfBusy) return;
+  if(!window.jspdf || !window.html2canvas){ alert("PDF tools still loading — give it a second and tap again."); return; }
+  pdfBusy=true;
+  const btn=$("#pdfBtn"); const orig=btn.innerHTML; btn.disabled=true; btn.textContent="Building…";
+  try{
+    const labels=[...document.querySelectorAll("#printArea .pvwrap .label")];
+    if(!labels.length) throw new Error("no labels to build");
+    const { jsPDF }=window.jspdf;
+    const doc=new jsPDF({orientation:"landscape",unit:"in",format:[6,4],compress:true});
+    for(let i=0;i<labels.length;i++){
+      const lab=labels[i];
+      const prev=lab.style.transform; lab.style.transform="none";   // capture at full 576x384
+      const canvas=await html2canvas(lab,{scale:3,backgroundColor:"#ffffff",
+        width:576,height:384,windowWidth:1200,windowHeight:900,logging:false,useCORS:true});
+      lab.style.transform=prev;
+      if(i>0) doc.addPage([6,4],"landscape");
+      doc.addImage(canvas.toDataURL("image/png"),"PNG",0,0,6,4);   // one label fills the whole 6x4 page
+    }
+    const stamp=(loadedDate||"").replace(/[^0-9]/g,"");
+    doc.save("SupplyNow-CartLabels"+(stamp?"-"+stamp:"")+".pdf");
+  }catch(e){
+    console.error("PDF build failed:",e); alert("Couldn't build the PDF: "+((e&&e.message)||e));
+  }finally{
+    btn.disabled=false; btn.innerHTML=orig; pdfBusy=false;
+  }
+}
+
 function buildLabel(lb,idx){
   const el=document.createElement("div");
   el.className="label"+(lb.generic?" generic":"");
@@ -839,7 +873,7 @@ function buildLabel(lb,idx){
     const hasOrder=!!lb.id;   // SNAP / hospital stops have no RD order number
     codes=`<div class="lcodes"><div class="qrbox" id="qr${idx}"></div>
       <div class="ordtag">${hasOrder?`ORDER #…<b>${last4(lb.id)}</b>`:'NO ORDER #'}</div></div>`;
-    bar=hasOrder?`<div class="lbar"><svg id="bc${idx}"></svg></div>`:'';
+    bar=hasOrder?`<div class="lbar"><canvas id="bc${idx}"></canvas></div>`:'';
     body=`<div class="lbody">
         <div class="linfo">
           <div class="lacct">${escapeHtml(lb.acct)}</div>
