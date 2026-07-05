@@ -185,21 +185,22 @@
   /* ---------- the 4x6 label (576 x 384 px == 6in x 4in @96dpi, landscape) ---------- */
   .label{width:576px;height:384px;background:#fff;color:#000;position:relative;
     font-family:var(--sans);overflow:hidden;display:flex;flex-direction:column}
-  .label .lhdr{display:flex;align-items:stretch;color:#fff}
-  .label .lhdr.d{background:#1f5fce}
-  .label .lhdr.p{background:#b5247f}
-  .label .lhdr.g{background:#0E1419}
+  /* thermal printers are black-only — all headers solid black w/ white knockout text */
+  .label .lhdr{display:flex;align-items:stretch;color:#fff;background:#000}
+  .label .lhdr.d{background:#000}
+  .label .lhdr.p{background:#000}
+  .label .lhdr.g{background:#000}
   .label .lhdr .ltype{font-size:30px;font-weight:900;letter-spacing:.04em;padding:14px 18px;line-height:1}
   .label .lhdr .lwin{margin-left:auto;text-align:right;padding:12px 18px;line-height:1.1}
   .label .lhdr .lwin .w{font-family:var(--mono);font-size:21px;font-weight:800}
-  .label .lhdr .lwin .dt{font-family:var(--mono);font-size:12px;opacity:.85}
+  .label .lhdr .lwin .dt{font-family:var(--mono);font-size:12px;opacity:1}
   .label .lbody{flex:1;display:flex;padding:14px 18px 0;gap:14px;min-height:0}
   .label .linfo{flex:1;min-width:0}
   .label .lacct{font-size:34px;font-weight:900;letter-spacing:-.02em;line-height:1.02;
     margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .label .lcity{font-size:18px;font-weight:700;color:#222;margin-bottom:12px}
   .label .lrow{display:flex;gap:22px;margin-bottom:9px}
-  .label .lfield .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#777;font-weight:800}
+  .label .lfield .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#555;font-weight:800}
   .label .lfield .v{font-family:var(--mono);font-size:19px;font-weight:800}
   .label .lcart .v{font-size:23px}
   .label .lcodes{width:128px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -221,13 +222,18 @@
   /* ---------- print ---------- */
   @media print{
     @page{size:6in 4in;margin:0}
-    html,body{background:#fff}
+    html,body{margin:0!important;padding:0!important;background:#fff}
     body *{visibility:hidden}
     #printArea,#printArea *{visibility:visible}
-    #printArea{position:absolute;left:0;top:0;width:auto}
-    .pvwrap{box-shadow:none!important;border-radius:0!important;transform:none!important}
-    .pvgrid{gap:0;display:block}
-    .label{transform:none!important;page-break-after:always;break-after:page}
+    #printArea{position:absolute;left:0;top:0;width:6in;margin:0!important;padding:0!important}
+    /* one label per page, all in ONE print job — neutralize the on-screen preview scaling */
+    .pvgrid{display:block!important;gap:0!important;margin:0!important;padding:0!important;align-items:stretch!important}
+    .pvwrap{width:6in!important;height:4in!important;overflow:hidden!important;margin:0!important;
+      box-shadow:none!important;border-radius:0!important;
+      break-inside:avoid;page-break-inside:avoid;
+      break-after:page;page-break-after:always}
+    .pvwrap:last-child{break-after:auto!important;page-break-after:auto!important}  /* no trailing blank page */
+    .label{transform:none!important;width:6in!important;height:4in!important;margin:0!important}
   }
 </style>
 </head>
