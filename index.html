@@ -529,6 +529,8 @@ function minToTime(m){
   const ap=h>=12?"PM":"AM"; let hh=h%12; if(hh===0) hh=12;
   return hh+":"+String(mm).padStart(2,"0")+" "+ap;
 }
+// afternoon fix: a 1:00–1:59 AM fulfillment is really 1 PM (the feed drops the PM) — flip it forward 12h
+function flip1am(sm){ return (sm>=60 && sm<120) ? sm+720 : sm; }
 function cityFromAddress(a){
   const p=String(a||"").split(",").map(s=>s.trim()).filter(Boolean);
   return p[1]||p[0]||"";      // "street, CITY, ST, zip" -> CITY
@@ -538,14 +540,15 @@ function rowToOrder(row){
   const id   = String(row["Order Number"]||"").trim();
   const biz  = String(row["business Name"]||"").trim();
   const cust = String(row["customer name"]||"").trim();
-  const win  = String(row["Start"]||"").trim();
+  const rawWin = String(row["Start"]||"").trim();
+  const sm   = flip1am(minutesFromTime(rawWin));
   return {
     id,
     acct:  biz || cust || "—",
     city:  cityFromAddress(row["Address"]),
     type:  /pickup/i.test(String(row["Delivery Type"]||"")) ? "Pickup" : "Delivery",
-    win,
-    startMin: minutesFromTime(win),
+    win:   sm>0 ? minToTime(sm) : rawWin,
+    startMin: sm,
     cases:  Math.round(Number(String(row["Load"]||"").replace(/[^0-9.\-]/g,""))||0),
     amount: Number(String(row["Order Total"]||"").replace(/[^0-9.\-]/g,""))||0,
     _tag:  String(row["Fulfillment Tag"]||"").trim(),
@@ -573,7 +576,7 @@ function buildFromRows(rows){ groupOrders(rows.map(rowToOrder)); }
 function buildFromFeed(resp){
   loadedDate = String(resp.date||"").trim();
   groupOrders((resp.orders||[]).map(o=>{
-    const sm=Number(o.startMin)||minutesFromTime(o.win);
+    const sm=flip1am(Number(o.startMin)||minutesFromTime(o.win));
     return {
       id:String(o.id||"").trim(),
       acct:String(o.acct||"—"),
