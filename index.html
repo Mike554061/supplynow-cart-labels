@@ -1229,10 +1229,10 @@ function dragStart(e){
   _drag.rows=[...list.querySelectorAll(".rsrow")];
   _drag.index=_drag.rows.indexOf(row);
   row.classList.add("dragging");
-  try{handle.setPointerCapture(e.pointerId);}catch(_){}
-  handle.addEventListener("pointermove",dragMove);
-  handle.addEventListener("pointerup",dragEnd);
-  handle.addEventListener("pointercancel",dragEnd);
+  // listen on window so we never miss the move/up even if the pointer leaves the small handle
+  window.addEventListener("pointermove",dragMove);
+  window.addEventListener("pointerup",dragEnd);
+  window.addEventListener("pointercancel",dragEnd);
 }
 function dragMove(e){
   if(!_drag) return;
@@ -1257,10 +1257,9 @@ function dragMove(e){
 function dragEnd(e){
   const d=_drag; _drag=null; if(!d) return;
   d.row.style.transform=""; d.row.style.zIndex=""; d.row.classList.remove("dragging");
-  d.handle.removeEventListener("pointermove",dragMove);
-  d.handle.removeEventListener("pointerup",dragEnd);
-  d.handle.removeEventListener("pointercancel",dragEnd);
-  try{d.handle.releasePointerCapture(e.pointerId);}catch(_){}
+  window.removeEventListener("pointermove",dragMove);
+  window.removeEventListener("pointerup",dragEnd);
+  window.removeEventListener("pointercancel",dragEnd);
   if(!d.moved){ runToggleDone(d.uid); return; }             // a clean tap = mark picked
   const finalUids=[...d.list.querySelectorAll(".rsrow")].map(r=>r.dataset.uid);
   lsSet(ordKey(d.loc), finalUids);                          // save the manager's sequence
