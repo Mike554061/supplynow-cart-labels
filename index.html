@@ -243,6 +243,14 @@
   .instrta:focus{border-color:var(--amber)}
   .instrta::placeholder{color:var(--faint)}
   .instrhint{font-size:11px;color:var(--faint);margin-top:6px;font-family:var(--mono)}
+  .beginbtn{width:100%;background:var(--frost);color:#04201d;font-weight:800;font-size:15px;border-radius:12px;
+    padding:14px;margin-bottom:16px;box-shadow:0 6px 20px rgba(53,208,192,.25)}
+  .beginbtn:active{transform:translateY(1px)}
+  .shiftstatus{background:var(--panel);border:1px solid var(--frost-d);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+  .shiftstatus .ss1{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;color:var(--frost)}
+  .shiftstatus .ss2{color:var(--dim);font-size:12px;font-family:var(--mono);margin-top:3px}
+  .shiftstatus .ss3{color:var(--frost);font-size:12px;margin-top:6px;font-weight:700}
+  .dotlive{width:8px;height:8px;border-radius:50%;background:var(--frost);box-shadow:0 0 10px var(--frost)}
 
   /* checklist */
   .ckprog{margin-bottom:16px}
@@ -492,6 +500,10 @@ const CONFIG = {
   // Locked feed: read-only Apps Script web app that returns ONLY label fields (no emails/PII).
   // Once deployed, paste its /exec URL here — the app uses it and the sheet can go private.
   FEED_URL:  "https://script.google.com/macros/s/AKfycbwPFGlLlxbPrzO5_DwH3fQrDJGhieWYVdpVm6XrlMil4l8sYJw269vMQFerQtXwtDz1bw/exec",
+  // Run Sheet endpoint (Apps Script web app): stores Special Instructions for dispatch→selection sync
+  // and sends the START + COMPLETE emails. Paste the deployed /exec URL here — until then the app runs
+  // fully local (no sync, no email). See the "SupplyNow Run Sheet" Apps Script.
+  RUNSHEET_URL: "",
   // Fallback: direct sheet read via gviz (used only while FEED_URL is empty).
   SHEET_ID:  "1P0sNXO_XOylSCtptHXwbvMvxv5BnqXN8AARX2Tkgdjc",
   ORDERS_TAB:"Routing_Date",
@@ -1089,6 +1101,7 @@ function openOps(){
   if(!state.runSort) state.runSort="smart";
   show("ops");
   renderOps();
+  rsLoadInstr();   // pull any dispatch instructions synced for today (if the endpoint is set)
 }
 function opsBack(){ if(state.loc){show("list");renderList();} else {show("loc");renderLocations();} }
 function opsTab(t){state.opsTab=t;renderOps();}
@@ -1126,11 +1139,20 @@ function renderChecklist(){
   const doneN=CHECKLIST.reduce((a,g)=>a+g.items.filter(i=>done[i.id]).length,0);
   const pct=total?Math.round(doneN/total*100):0;
   const instr=lsGet(instrKey(),"");
+  const shift=lsGet(shiftKey(),{});
+  const shiftHtml = !shift.started
+    ? `<button class="beginbtn" onclick="beginSelection()">▶ Begin Selection</button>`
+    : `<div class="shiftstatus">
+         <div class="ss1"><span class="dotlive"></span> Selection in progress</div>
+         <div class="ss2">${escapeHtml(shift.selector||'—')} · started ${shift.startTime||'—'}</div>
+         ${shift.completeSent?`<div class="ss3">✅ Completed ${shift.completeTime||''} · digest sent to ops</div>`:''}
+       </div>`;
   let html=`<div class="instrbox">
       <div class="instrhd"><span class="ihk">Special Instructions &amp; Adjustments</span><span class="ihs">dispatch → selection</span></div>
-      <textarea id="instrField" class="instrta" placeholder="Night-prior notes from dispatch — add-ons, account call-outs, palletize X, timing changes, subs… Saved to today's run sheet and the end-of-day digest." oninput="saveInstr(this.value)">${escapeHtml(instr)}</textarea>
+      <textarea id="instrField" class="instrta" placeholder="Night-prior notes from dispatch — add-ons, account call-outs, palletize X, timing changes, subs… Saved to today's run sheet and the end-of-day digest." oninput="saveInstr(this.value)" onchange="pushInstr(this.value)">${escapeHtml(instr)}</textarea>
       <div class="instrhint" id="instrHint">${instr?'Saved ✓':'Saved automatically as you type'}</div>
     </div>
+    ${shiftHtml}
     <div class="ckprog"><div class="ckbar"><span style="width:${pct}%"></span></div>
      <div class="ckprogtxt">${doneN}/${total} done · ${pct}%<button class="ckreset" onclick="resetChecklist()">Reset day</button></div></div>`;
   CHECKLIST.forEach(g=>{
@@ -1149,7 +1171,49 @@ function renderChecklist(){
 }
 function instrKey(){return "sn_instr_"+($("#date").value||"x");}
 function saveInstr(v){ lsSet(instrKey(), v); const h=document.getElementById("instrHint"); if(h) h.textContent="Saved ✓"; }
-function ckToggle(id){const d=lsGet(ckKey(),{});if(d[id])delete d[id];else d[id]=1;lsSet(ckKey(),d);renderOps();}
+function ckToggle(id){const d=lsGet(ckKey(),{});if(d[id])delete d[id];else d[id]=1;lsSet(ckKey(),d);checkShiftComplete();renderOps();}
+
+/* --- shift sign-in + start/complete emails (needs CONFIG.RUNSHEET_URL; local-only until set) --- */
+function shiftKey(){return "sn_shift_"+($("#date").value||"x")+"_"+(state.opsLoc||"");}
+function nowStr(){try{return new Date().toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}}
+function depotName(){return (LOCATIONS.find(x=>x.key===state.opsLoc)||{}).city||state.opsLoc||"";}
+function rsCall(params){
+  if(!CONFIG.RUNSHEET_URL) return Promise.resolve(null);
+  const q=Object.keys(params).map(k=>encodeURIComponent(k)+"="+encodeURIComponent(params[k]==null?"":params[k])).join("&");
+  return jsonp(CONFIG.RUNSHEET_URL+(CONFIG.RUNSHEET_URL.includes("?")?"&":"?")+q).catch(e=>{console.warn("runsheet call failed:",e);return null;});
+}
+function pushInstr(v){ saveInstr(v); rsCall({mode:"saveInstr",date:$("#date").value,text:v}); }
+function rsLoadInstr(){
+  if(!CONFIG.RUNSHEET_URL) return;
+  rsCall({mode:"getInstr",date:$("#date").value}).then(r=>{
+    if(r&&r.ok&&typeof r.text==="string"&&r.text!==lsGet(instrKey(),"")){
+      lsSet(instrKey(),r.text);
+      const f=document.getElementById("instrField");
+      if(f && document.activeElement!==f){ f.value=r.text; const h=document.getElementById("instrHint"); if(h) h.textContent="Synced from dispatch ✓"; }
+    }
+  });
+}
+function beginSelection(){
+  const shift=lsGet(shiftKey(),{});
+  let name=shift.selector;
+  if(!name){ name=prompt("Selector sign-in — who is running this shift? (name required)"); if(!name||!name.trim()) return; name=name.trim(); }
+  shift.selector=name; shift.started=true; shift.startTime=nowStr(); lsSet(shiftKey(),shift);
+  rsCall({mode:"start",date:$("#date").value,depot:depotName(),selector:name,time:shift.startTime});
+  renderOps();
+}
+function checkShiftComplete(){
+  const done=lsGet(ckKey(),{});
+  const total=CHECKLIST.reduce((a,g)=>a+g.items.length,0);
+  const doneN=CHECKLIST.reduce((a,g)=>a+g.items.filter(i=>done[i.id]).length,0);
+  const shift=lsGet(shiftKey(),{});
+  if(doneN===total && shift.started && !shift.completeSent){
+    shift.completeTime=nowStr(); shift.completeSent=true; lsSet(shiftKey(),shift);
+    const rs=lsGet(runKey(state.opsLoc),{}); const arr=(ORDERS[state.opsLoc]||[]);
+    const picked=arr.filter(o=>rs[o._uid]&&rs[o._uid].done).length+"/"+arr.length;
+    rsCall({mode:"complete",date:$("#date").value,depot:depotName(),selector:shift.selector||"",
+      start:shift.startTime||"",time:shift.completeTime,done:doneN+"/"+total,picked});
+  }
+}
 function resetChecklist(){lsSet(ckKey(),{});renderOps();}
 
 /* --- pick order / run sheet --- */
