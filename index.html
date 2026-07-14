@@ -232,6 +232,18 @@
   .opstabs button{flex:1;padding:10px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--dim)}
   .opstabs button.on{background:var(--frost);color:#04201d}
 
+  /* special instructions */
+  .instrbox{background:var(--panel);border:1px solid var(--amber);border-radius:14px;padding:13px;margin-bottom:16px;
+    box-shadow:0 0 0 1px rgba(245,181,68,.14)}
+  .instrhd{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .instrhd .ihk{font-weight:800;font-size:14px;color:var(--amber)}
+  .instrhd .ihs{margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-family:var(--mono)}
+  .instrta{width:100%;min-height:74px;resize:vertical;background:var(--ink);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);font-family:var(--sans);font-size:14px;line-height:1.45;padding:11px;outline:none}
+  .instrta:focus{border-color:var(--amber)}
+  .instrta::placeholder{color:var(--faint)}
+  .instrhint{font-size:11px;color:var(--faint);margin-top:6px;font-family:var(--mono)}
+
   /* checklist */
   .ckprog{margin-bottom:16px}
   .ckbar{height:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
@@ -1113,7 +1125,13 @@ function renderChecklist(){
   const total=CHECKLIST.reduce((a,g)=>a+g.items.length,0);
   const doneN=CHECKLIST.reduce((a,g)=>a+g.items.filter(i=>done[i.id]).length,0);
   const pct=total?Math.round(doneN/total*100):0;
-  let html=`<div class="ckprog"><div class="ckbar"><span style="width:${pct}%"></span></div>
+  const instr=lsGet(instrKey(),"");
+  let html=`<div class="instrbox">
+      <div class="instrhd"><span class="ihk">Special Instructions &amp; Adjustments</span><span class="ihs">dispatch → selection</span></div>
+      <textarea id="instrField" class="instrta" placeholder="Night-prior notes from dispatch — add-ons, account call-outs, palletize X, timing changes, subs… Saved to today's run sheet and the end-of-day digest." oninput="saveInstr(this.value)">${escapeHtml(instr)}</textarea>
+      <div class="instrhint" id="instrHint">${instr?'Saved ✓':'Saved automatically as you type'}</div>
+    </div>
+    <div class="ckprog"><div class="ckbar"><span style="width:${pct}%"></span></div>
      <div class="ckprogtxt">${doneN}/${total} done · ${pct}%<button class="ckreset" onclick="resetChecklist()">Reset day</button></div></div>`;
   CHECKLIST.forEach(g=>{
     const gd=g.items.filter(i=>done[i.id]).length;
@@ -1129,6 +1147,8 @@ function renderChecklist(){
   });
   return html;
 }
+function instrKey(){return "sn_instr_"+($("#date").value||"x");}
+function saveInstr(v){ lsSet(instrKey(), v); const h=document.getElementById("instrHint"); if(h) h.textContent="Saved ✓"; }
 function ckToggle(id){const d=lsGet(ckKey(),{});if(d[id])delete d[id];else d[id]=1;lsSet(ckKey(),d);renderOps();}
 function resetChecklist(){lsSet(ckKey(),{});renderOps();}
 
