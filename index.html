@@ -270,8 +270,16 @@
     border-radius:13px;margin-bottom:9px;overflow:hidden;transition:.12s}
   .rsrow.done{opacity:.5}
   .rsnum{width:44px;flex:none;font-family:var(--mono);font-weight:800;font-size:16px;color:var(--frost);
-    background:var(--panel2);border-right:1px solid var(--line)}
+    background:var(--panel2);border-right:1px solid var(--line);cursor:grab;touch-action:none;position:relative;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .rsnum:active{cursor:grabbing}
+  .rsnum .grip{width:12px;height:7px;opacity:.55;
+    background:radial-gradient(circle at center,var(--faint) 1.1px,transparent 1.5px);background-size:4px 3.5px}
   .rsrow.done .rsnum{background:var(--frost);color:#04201d}
+  .rsrow.done .rsnum .grip{opacity:0}
+  .rsrow.dragging{border-color:var(--frost);box-shadow:0 12px 30px rgba(0,0,0,.55);opacity:1}
+  .rsreset{background:var(--panel);border:1px solid var(--frost-d);border-radius:7px;padding:3px 9px;
+    font-size:11px;font-weight:700;color:var(--frost);margin-left:2px}
   .rsmain{flex:1;min-width:0;text-align:left;padding:11px 12px}
   .rstop{display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap}
   .rswin{font-family:var(--mono);font-size:13px;font-weight:700}
@@ -1096,6 +1104,7 @@ function renderOps(){
   p.innerHTML = state.opsTab==='pick' ? renderRunSheet()
               : state.opsTab==='play' ? renderPlaybook()
               : renderChecklist();
+  if(state.opsTab==='pick') attachReorder();
 }
 
 /* --- checklist --- */
@@ -1129,7 +1138,15 @@ function renderRunSheet(){
   const opts=LOCATIONS.map(x=>`<option value="${x.key}"${x.key===loc?' selected':''}>${escapeHtml(x.city)} (${(ORDERS[x.key]||[]).length})</option>`).join("");
   let arr=(ORDERS[loc]||[]).slice();
   const rs=lsGet(runKey(loc),{});
-  if(state.runSort==="type") arr.sort((a,b)=> (a.type<b.type?-1:a.type>b.type?1:0) || (a.startMin-b.startMin));
+  if(state.runSort==="manual"){
+    const pos={}; (lsGet(ordKey(loc),[])).forEach((u,i)=>pos[u]=i);
+    arr.sort((a,b)=>{
+      const pa=pos[a._uid], pb=pos[b._uid];
+      if(pa==null&&pb==null) return (a.startMin-b.startMin)||(pickRank(a)-pickRank(b))||(b.amount-a.amount);
+      if(pa==null) return 1; if(pb==null) return -1; return pa-pb;   // unknown (new) orders fall to the end
+    });
+  }
+  else if(state.runSort==="type") arr.sort((a,b)=> (a.type<b.type?-1:a.type>b.type?1:0) || (a.startMin-b.startMin));
   else if(state.runSort==="time") arr.sort((a,b)=> (a.startMin-b.startMin) || (a.type<b.type?-1:1));
   else arr.sort((a,b)=> (a.startMin-b.startMin) || (pickRank(a)-pickRank(b)) || (b.amount-a.amount)); // smart pick order (default)
   const nD=arr.filter(o=>o.type==='Delivery').length, nP=arr.length-nD;
@@ -1152,14 +1169,18 @@ function renderRunSheet(){
      <div class="rsstat"><b class="fr">${money(tot)}</b><span>total</span></div>
      <div class="rsstat"><b class="am">${flagged}</b><span>&gt;$2k</span></div>
    </div>
-   <div class="rspick">${state.runSort==='smart'?'Pick order — by time slot, then $2k+ deliveries, pickups, rest (largest→smallest).':state.runSort==='type'?'Grouped by type, then earliest fulfillment first.':'Earliest fulfillment first.'} Tap a row when picked. <b>${pickedN}/${arr.length} picked</b></div>`;
+   <div class="rspick">${
+     state.runSort==='manual'?'Manual order — drag the ⠿ handle to re-sequence. <button class="rsreset" onclick="opsResetOrder()">Reset to Auto</button>':
+     state.runSort==='smart'?'Pick order — by time slot, then $2k+ deliveries, pickups, rest (largest→smallest). Drag the ⠿ handle to override.':
+     state.runSort==='type'?'Grouped by type, then earliest fulfillment first.':'Earliest fulfillment first.'
+   } Tap a row when picked. <b>${pickedN}/${arr.length} picked</b></div>`;
   if(!arr.length){ html+=`<div class="empty-list">No orders loaded for this depot on ${prettyDate($("#date").value)}.</div>`; return html; }
   arr.forEach((o,idx)=>{
     const st=rs[o._uid]||{};
     const d=o.type==='Delivery';
     const hi=o.amount>2000;
-    html+=`<div class="rsrow${st.done?' done':''}">
-      <button class="rsnum" onclick="runToggleDone('${o._uid}')">${st.done?'✓':String(idx+1).padStart(2,'0')}</button>
+    html+=`<div class="rsrow${st.done?' done':''}" data-uid="${o._uid}">
+      <button class="rsnum" data-uid="${o._uid}" title="Tap = picked · Drag = re-sequence">${st.done?'✓':String(idx+1).padStart(2,'0')}<i class="grip"></i></button>
       <div class="rsmain" onclick="runToggleDone('${o._uid}')">
         <div class="rstop"><span class="rswin">${o.win||'—'}</span>
           <span class="typetag ${d?'d':'p'}">${o.type.toUpperCase()}</span>
@@ -1189,6 +1210,63 @@ function runGet(loc){return lsGet(runKey(loc),{});}
 function runToggleDone(uid){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};rs[uid].done=!rs[uid].done;lsSet(runKey(loc),rs);renderOps();}
 function runFlag(uid,f){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};rs[uid][f]=!rs[uid][f];lsSet(runKey(loc),rs);renderOps();}
 function runNote(uid){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};const v=prompt("Special note / substitution for this order:",rs[uid].note||"");if(v===null)return;rs[uid].note=v.trim();if(!rs[uid].note)delete rs[uid].note;lsSet(runKey(loc),rs);renderOps();}
+
+/* --- manual re-sequence (drag the number handle; mouse + touch via Pointer Events) --- */
+function ordKey(loc){return "sn_ord_"+($("#date").value||"x")+"_"+(loc||"");}
+function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+function opsResetOrder(){ lsDel(ordKey(state.opsLoc)); state.runSort="smart"; renderOps(); }
+
+let _drag=null;
+function attachReorder(){
+  const panel=document.getElementById("opsPanel"); if(!panel) return;
+  panel.querySelectorAll(".rsnum").forEach(h=>h.addEventListener("pointerdown",dragStart));
+}
+function dragStart(e){
+  e.preventDefault();
+  const handle=e.currentTarget, row=handle.closest(".rsrow"); if(!row) return;
+  const list=row.parentElement;
+  _drag={handle,row,list,uid:row.dataset.uid,loc:state.opsLoc,startY:e.clientY,dy:0,moved:false};
+  _drag.rows=[...list.querySelectorAll(".rsrow")];
+  _drag.index=_drag.rows.indexOf(row);
+  row.classList.add("dragging");
+  try{handle.setPointerCapture(e.pointerId);}catch(_){}
+  handle.addEventListener("pointermove",dragMove);
+  handle.addEventListener("pointerup",dragEnd);
+  handle.addEventListener("pointercancel",dragEnd);
+}
+function dragMove(e){
+  if(!_drag) return;
+  _drag.dy=e.clientY-_drag.startY;
+  if(Math.abs(_drag.dy)>6) _drag.moved=true;
+  _drag.row.style.transform="translateY("+_drag.dy+"px)";
+  _drag.row.style.zIndex="20";
+  const y=e.clientY; let over=-1;
+  for(let i=0;i<_drag.rows.length;i++){
+    const r=_drag.rows[i]; if(r===_drag.row) continue;
+    const c=r.getBoundingClientRect();
+    if(y>=c.top && y<=c.bottom){ over=i; break; }
+  }
+  if(over>-1 && over!==_drag.index){
+    const target=_drag.rows[over];
+    if(over>_drag.index) target.after(_drag.row); else target.before(_drag.row);
+    _drag.rows=[..._drag.list.querySelectorAll(".rsrow")];
+    _drag.index=_drag.rows.indexOf(_drag.row);
+    _drag.startY=e.clientY; _drag.dy=0; _drag.row.style.transform="translateY(0px)"; _drag.moved=true;
+  }
+}
+function dragEnd(e){
+  const d=_drag; _drag=null; if(!d) return;
+  d.row.style.transform=""; d.row.style.zIndex=""; d.row.classList.remove("dragging");
+  d.handle.removeEventListener("pointermove",dragMove);
+  d.handle.removeEventListener("pointerup",dragEnd);
+  d.handle.removeEventListener("pointercancel",dragEnd);
+  try{d.handle.releasePointerCapture(e.pointerId);}catch(_){}
+  if(!d.moved){ runToggleDone(d.uid); return; }             // a clean tap = mark picked
+  const finalUids=[...d.list.querySelectorAll(".rsrow")].map(r=>r.dataset.uid);
+  lsSet(ordKey(d.loc), finalUids);                          // save the manager's sequence
+  state.runSort="manual";
+  renderOps();
+}
 
 /* --- playbook --- */
 function renderPlaybook(){
