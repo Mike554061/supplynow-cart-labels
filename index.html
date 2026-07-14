@@ -1066,7 +1066,7 @@ const CHECKLIST=[
 function openOps(){
   if(!state.opsLoc) state.opsLoc = state.loc || (LOCATIONS[0]&&LOCATIONS[0].key) || "";
   if(!state.opsTab) state.opsTab="shift";
-  if(!state.runSort) state.runSort="time";
+  if(!state.runSort) state.runSort="smart";
   show("ops");
   renderOps();
 }
@@ -1130,7 +1130,8 @@ function renderRunSheet(){
   let arr=(ORDERS[loc]||[]).slice();
   const rs=lsGet(runKey(loc),{});
   if(state.runSort==="type") arr.sort((a,b)=> (a.type<b.type?-1:a.type>b.type?1:0) || (a.startMin-b.startMin));
-  else arr.sort((a,b)=> (a.startMin-b.startMin) || (a.type<b.type?-1:1));
+  else if(state.runSort==="time") arr.sort((a,b)=> (a.startMin-b.startMin) || (a.type<b.type?-1:1));
+  else arr.sort((a,b)=> (a.startMin-b.startMin) || (pickRank(a)-pickRank(b)) || (b.amount-a.amount)); // smart pick order (default)
   const nD=arr.filter(o=>o.type==='Delivery').length, nP=arr.length-nD;
   const tot=arr.reduce((a,b)=>a+b.amount,0);
   const flagged=arr.filter(o=>o.amount>2000).length;
@@ -1139,7 +1140,8 @@ function renderRunSheet(){
    <div class="rsctl">
      <select class="rsdepot" onchange="opsSetLoc(this.value)">${opts||'<option>No depots loaded</option>'}</select>
      <div class="seg rsseg">
-       <button class="${state.runSort!=='type'?'on':''}" onclick="opsSort('time')">Time</button>
+       <button class="${state.runSort==='smart'?'on':''}" onclick="opsSort('smart')">Auto</button>
+       <button class="${state.runSort==='time'?'on':''}" onclick="opsSort('time')">Time</button>
        <button class="${state.runSort==='type'?'on':''}" onclick="opsSort('type')">Type</button>
      </div>
    </div>
@@ -1150,7 +1152,7 @@ function renderRunSheet(){
      <div class="rsstat"><b class="fr">${money(tot)}</b><span>total</span></div>
      <div class="rsstat"><b class="am">${flagged}</b><span>&gt;$2k</span></div>
    </div>
-   <div class="rspick">Pick sequence — ${state.runSort==='type'?'grouped by type, then ':''}earliest fulfillment first. Tap a row when picked. <b>${pickedN}/${arr.length} picked</b></div>`;
+   <div class="rspick">${state.runSort==='smart'?'Pick order — by time slot, then $2k+ deliveries, pickups, rest (largest→smallest).':state.runSort==='type'?'Grouped by type, then earliest fulfillment first.':'Earliest fulfillment first.'} Tap a row when picked. <b>${pickedN}/${arr.length} picked</b></div>`;
   if(!arr.length){ html+=`<div class="empty-list">No orders loaded for this depot on ${prettyDate($("#date").value)}.</div>`; return html; }
   arr.forEach((o,idx)=>{
     const st=rs[o._uid]||{};
@@ -1176,6 +1178,12 @@ function renderRunSheet(){
     </div>`;
   });
   return html;
+}
+// pick-order tier within a time slot: 0 = delivery over $2k, 1 = pickup, 2 = the rest (delivery <= $2k)
+function pickRank(o){
+  if(o.type==='Delivery' && o.amount>2000) return 0;
+  if(o.type==='Pickup') return 1;
+  return 2;
 }
 function runGet(loc){return lsGet(runKey(loc),{});}
 function runToggleDone(uid){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};rs[uid].done=!rs[uid].done;lsSet(runKey(loc),rs);renderOps();}
