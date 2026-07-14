@@ -221,6 +221,87 @@
   .hint{color:var(--faint);font-size:12px;text-align:center;margin:14px auto 0;max-width:440px;line-height:1.5}
   .hidden{display:none!important}
 
+  /* ---------- daily run sheet / ops ---------- */
+  .runbtn{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:8px 11px;font-size:12px;font-weight:800;color:var(--frost);letter-spacing:.02em}
+  .runbtn:hover{background:var(--panel2)}
+  .opshead{display:flex;align-items:center;gap:10px;margin:2px 0 14px}
+  .opshead .ltitle{font-size:21px;font-weight:800;letter-spacing:-.01em}
+  .opshead .lcount{color:var(--faint);font-family:var(--mono);font-size:12px}
+  .opstabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:16px}
+  .opstabs button{flex:1;padding:10px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--dim)}
+  .opstabs button.on{background:var(--frost);color:#04201d}
+
+  /* checklist */
+  .ckprog{margin-bottom:16px}
+  .ckbar{height:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .ckbar span{display:block;height:100%;background:var(--frost);transition:.25s}
+  .ckprogtxt{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12px;font-family:var(--mono);margin-top:7px}
+  .ckreset{margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--faint)}
+  .ckgroup{margin-bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .ckhd{display:flex;align-items:center;gap:8px;padding:12px 13px;border-bottom:1px solid var(--line)}
+  .ckdot{width:9px;height:9px;border-radius:3px;flex:none}
+  .ckph{font-weight:800;font-size:14px;letter-spacing:-.01em}
+  .cktime{color:var(--faint);font-family:var(--mono);font-size:11px}
+  .ckcount{margin-left:auto;color:var(--dim);font-family:var(--mono);font-size:12px}
+  .ckitem{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;padding:11px 13px;border-top:1px solid rgba(42,55,66,.5)}
+  .ckitem .ckbox{width:22px;height:22px;border-radius:6px;border:2px solid var(--line);flex:none;
+    display:flex;align-items:center;justify-content:center;color:#04201d;font-weight:900;font-size:13px;margin-top:1px;transition:.12s}
+  .ckitem.on .ckbox{background:var(--frost);border-color:var(--frost)}
+  .ckitem .cktxt{font-size:14px;line-height:1.4;color:var(--txt)}
+  .ckitem.on .cktxt{color:var(--faint);text-decoration:line-through}
+  .ckitem:active{background:var(--panel2)}
+  .cklink{width:100%;text-align:left;padding:11px 13px;border-top:1px solid var(--line);color:var(--frost);font-weight:700;font-size:13px;background:rgba(53,208,192,.06)}
+
+  /* run sheet / pick order */
+  .rsctl{display:flex;gap:9px;margin-bottom:12px}
+  .rsdepot{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;color:var(--txt);
+    font-size:14px;font-weight:700;padding:11px 12px;-webkit-appearance:none;appearance:none}
+  .rsseg{flex:none}
+  .rsstats{display:flex;gap:6px;margin-bottom:14px}
+  .rsstat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 4px;text-align:center}
+  .rsstat b{display:block;font-family:var(--mono);font-size:18px;font-weight:800}
+  .rsstat b.fr{color:var(--frost);font-size:12px}
+  .rsstat b.am{color:var(--amber)}
+  .rsstat span{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .rspick{color:var(--dim);font-size:12px;margin-bottom:12px;line-height:1.4}
+  .rspick b{color:var(--frost)}
+  .rsrow{display:flex;align-items:stretch;gap:0;background:var(--panel);border:1px solid var(--line);
+    border-radius:13px;margin-bottom:9px;overflow:hidden;transition:.12s}
+  .rsrow.done{opacity:.5}
+  .rsnum{width:44px;flex:none;font-family:var(--mono);font-weight:800;font-size:16px;color:var(--frost);
+    background:var(--panel2);border-right:1px solid var(--line)}
+  .rsrow.done .rsnum{background:var(--frost);color:#04201d}
+  .rsmain{flex:1;min-width:0;text-align:left;padding:11px 12px}
+  .rstop{display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap}
+  .rswin{font-family:var(--mono);font-size:13px;font-weight:700}
+  .rsacct{font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rsrow.done .rsacct{text-decoration:line-through}
+  .rssub{color:var(--dim);font-size:12px;font-family:var(--mono);margin-top:1px}
+  .rsnote{margin-top:5px;font-size:12px;color:var(--amber);background:rgba(245,181,68,.1);border-radius:7px;padding:5px 8px;white-space:normal}
+  .flag{font-size:9px;font-weight:800;letter-spacing:.05em;padding:2px 6px;border-radius:5px}
+  .flag.hi{color:#04201d;background:var(--amber)}
+  .flag.pl{color:#cfe0ff;background:rgba(59,130,246,.2)}
+  .flag.nt{color:var(--amber);background:rgba(245,181,68,.14)}
+  .rsact{display:flex;flex-direction:column;border-left:1px solid var(--line);flex:none}
+  .rsact button{flex:1;width:42px;font-size:15px;color:var(--faint)}
+  .rsact button.on{color:var(--frost);background:rgba(53,208,192,.1)}
+  .rsact button+button{border-top:1px solid var(--line)}
+
+  /* playbook */
+  .pbsec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .pbh{font-weight:800;font-size:14px;margin-bottom:10px}
+  .pbpri{display:flex;flex-wrap:wrap;gap:7px}
+  .pbpri span{font-size:12px;color:var(--dim);background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+  .pbpri b{color:var(--frost);font-family:var(--mono)}
+  .pbrow{display:flex;gap:10px;font-size:13px;color:var(--txt);padding:8px 0;border-top:1px solid rgba(42,55,66,.5);line-height:1.4}
+  .pbrow:first-of-type{border-top:none;padding-top:0}
+  .pbt{font-family:var(--mono);font-weight:800;color:var(--frost);flex:none;width:64px}
+  .pbfs{display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 0;color:var(--txt)}
+  .pbfs span{width:22px;height:22px;flex:none;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:800;font-size:11px;background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--dim)}
+  .pbnote{color:var(--dim);font-size:12px;line-height:1.5;margin-top:8px}
+
   /* ---------- print ---------- */
   @media print{
     @page{size:6in 4in;margin:0}
@@ -244,6 +325,7 @@
 <div class="topbar">
   <div class="mark"><span class="dot"></span>SUPPLYNOW <small>CART LABELS</small></div>
   <div class="spacer"></div>
+  <button class="runbtn" id="runBtn" onclick="openOps()">▤ Run Sheet</button>
   <div class="datechip">
     <label for="date">Date</label>
     <input type="date" id="date" />
@@ -298,6 +380,9 @@
   <div class="pvgrid" id="printArea"></div>
   <p class="hint">Tap <b>Save 4×6 PDF</b> to build one file — each label its own exact 6×4in page. Open it and print to your thermal printer (no paper-size or scaling to set). Black &amp; white, thermal-safe.</p>
 </div>
+
+<!-- SCREEN 4: DAILY RUN SHEET -->
+<div id="screenOps" class="wrap hidden"></div>
 
 <!-- FOOTER ACTION -->
 <div class="actionbar hidden" id="actionBar">
@@ -905,8 +990,217 @@ function show(which){
   $("#screenLoc").classList.toggle("hidden",which!=="loc");
   $("#screenList").classList.toggle("hidden",which!=="list");
   $("#screenPreview").classList.toggle("hidden",which!=="preview");
+  $("#screenOps").classList.toggle("hidden",which!=="ops");
   $("#actionBar").classList.toggle("hidden",which!=="list"||Object.keys(state.sel).length===0);
   window.scrollTo(0,0);
+}
+
+/* ----------------------------- daily run sheet / ops ----------------------------- */
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function ckKey(){return "sn_ck_"+($("#date").value||"x");}
+function runKey(loc){return "sn_run_"+($("#date").value||"x")+"_"+(loc||"");}
+
+// the daily accountability checklist — sourced from the Selection Operations Rundown
+const CHECKLIST=[
+ {ph:"Arrival", time:"4:30–4:35 AM", ac:"var(--frost)", items:[
+   {id:"a1",t:"Clock in"},
+   {id:"a2",t:"Put personal belongings away"},
+   {id:"a3",t:"Pull ALL orders for the day — JSS ▸ Online Orders ▸ Rest Depot / JetRod ▸ all orders for date"},
+   {id:"a4",t:"Check Slack for order adjustments / add-ons"},
+   {id:"a5",t:"Management check-in (Depot or SN Ops): confirm order count + who's where & when"},
+ ]},
+ {ph:"Build the roster", time:"before you pick", ac:"var(--amber)", link:1, items:[
+   {id:"r1",t:"Sort by fulfillment type (Pickup / Delivery)"},
+   {id:"r2",t:"Sort by fulfillment time — first to last"},
+   {id:"r3",t:"Flag orders over $2,000"},
+   {id:"r4",t:"Flag large-item buys (20+ of a single item)"},
+   {id:"r5",t:"Flag special notes / palletized orders"},
+   {id:"r6",t:"Confirm count of total orders → open the Pick Order tab"},
+ ]},
+ {ph:"Equipment check", time:"4:35–4:40 AM", ac:"var(--frost)", items:[
+   {id:"e1",t:"Unlock garage door"},
+   {id:"e2",t:"Grab shopping carts"},
+   {id:"e3",t:"Pallet wrap + pens ready"},
+   {id:"e4",t:"Print cart labels for each order (Labels screen)"},
+ ]},
+ {ph:"Selection flow", time:"the pick", ac:"var(--delivery)", items:[
+   {id:"s1",t:"Pick each order Row 1000 → back, keep like items grouped"},
+   {id:"s2",t:"Break case: pull single units, UPC facing out"},
+   {id:"s3",t:"Label each cart immediately, stage in pick sequence"},
+   {id:"s4",t:"Multi-cart orders stay grouped"},
+   {id:"s5",t:"Every item checked ✔ · OOS circled + reason + PO date · subs written on the row"},
+   {id:"s6",t:"Group carts per order, pick sheet in front, cart count noted (e.g. 4 carts)"},
+ ]},
+ {ph:"5:30 — Selector 2 handoff", time:"5:30 AM", ac:"var(--pickup)", items:[
+   {id:"h1",t:"Debrief: order updates, adjustments, known OOS, active issues"},
+   {id:"h2",t:"Confirm OOS photos already sent to customer support"},
+   {id:"h3",t:"Selector 2 begins — same standardized flow"},
+ ]},
+ {ph:"6:30 — Checkout & staging", time:"6:30 AM", ac:"var(--frost)", items:[
+   {id:"c1",t:"Selector 1 stops picking → owns staging integrity"},
+   {id:"c2",t:"Separate staging: Pickup vs Delivery"},
+   {id:"c3",t:"Palletize multi-cart delivery orders"},
+   {id:"c4",t:"Consolidate broken-case / singles into bins or boxes"},
+   {id:"c5",t:"Build pallets food-safety first (see Playbook)"},
+ ]},
+ {ph:"Downtime (if early)", time:"as needed", ac:"var(--faint)", items:[
+   {id:"d1",t:"Help another selector"},
+   {id:"d2",t:"Consolidate the staging area"},
+   {id:"d3",t:"Pull tomorrow's supplies"},
+   {id:"d4",t:"Clean coolers"},
+   {id:"d5",t:"Organize carts / ask for next assignment"},
+ ]},
+ {ph:"End of shift", time:"clock out", ac:"var(--amber)", items:[
+   {id:"z1",t:"Staging cleared of empty carts, pallets, trash"},
+   {id:"z2",t:"Check with Depot: order accuracy + product put back"},
+   {id:"z3",t:"All orders staged — drivers to load, pickups for customers"},
+   {id:"z4",t:"Report any shortages"},
+   {id:"z5",t:"Clock out"},
+ ]},
+];
+
+function openOps(){
+  if(!state.opsLoc) state.opsLoc = state.loc || (LOCATIONS[0]&&LOCATIONS[0].key) || "";
+  if(!state.opsTab) state.opsTab="shift";
+  if(!state.runSort) state.runSort="time";
+  show("ops");
+  renderOps();
+}
+function opsBack(){ if(state.loc){show("list");renderList();} else {show("loc");renderLocations();} }
+function opsTab(t){state.opsTab=t;renderOps();}
+function opsSetLoc(v){state.opsLoc=v;renderOps();}
+function opsSort(s){state.runSort=s;renderOps();}
+
+function renderOps(){
+  const el=$("#screenOps");
+  const iso=$("#date").value;
+  el.innerHTML=`
+    <div class="opshead">
+      <button class="back" onclick="opsBack()">‹ Labels</button>
+      <div>
+        <div class="ltitle">Daily Run Sheet</div>
+        <div class="lcount">${prettyDate(iso)}${loadedDate?" · batch "+loadedDate:""}</div>
+      </div>
+    </div>
+    <div class="opstabs">
+      <button class="${state.opsTab==='shift'?'on':''}" onclick="opsTab('shift')">Checklist</button>
+      <button class="${state.opsTab==='pick'?'on':''}" onclick="opsTab('pick')">Pick Order</button>
+      <button class="${state.opsTab==='play'?'on':''}" onclick="opsTab('play')">Playbook</button>
+    </div>
+    <div id="opsPanel"></div>`;
+  const p=$("#opsPanel");
+  p.innerHTML = state.opsTab==='pick' ? renderRunSheet()
+              : state.opsTab==='play' ? renderPlaybook()
+              : renderChecklist();
+}
+
+/* --- checklist --- */
+function renderChecklist(){
+  const done=lsGet(ckKey(),{});
+  const total=CHECKLIST.reduce((a,g)=>a+g.items.length,0);
+  const doneN=CHECKLIST.reduce((a,g)=>a+g.items.filter(i=>done[i.id]).length,0);
+  const pct=total?Math.round(doneN/total*100):0;
+  let html=`<div class="ckprog"><div class="ckbar"><span style="width:${pct}%"></span></div>
+     <div class="ckprogtxt">${doneN}/${total} done · ${pct}%<button class="ckreset" onclick="resetChecklist()">Reset day</button></div></div>`;
+  CHECKLIST.forEach(g=>{
+    const gd=g.items.filter(i=>done[i.id]).length;
+    html+=`<div class="ckgroup"><div class="ckhd"><span class="ckdot" style="background:${g.ac}"></span>
+      <span class="ckph">${g.ph}</span><span class="cktime">${g.time}</span><span class="ckcount">${gd}/${g.items.length}</span></div>`;
+    g.items.forEach(i=>{
+      const on=!!done[i.id];
+      html+=`<button class="ckitem${on?' on':''}" onclick="ckToggle('${i.id}')">
+        <span class="ckbox">${on?'✓':''}</span><span class="cktxt">${escapeHtml(i.t)}</span></button>`;
+    });
+    if(g.link) html+=`<button class="cklink" onclick="opsTab('pick')">Open Pick Order tab →</button>`;
+    html+=`</div>`;
+  });
+  return html;
+}
+function ckToggle(id){const d=lsGet(ckKey(),{});if(d[id])delete d[id];else d[id]=1;lsSet(ckKey(),d);renderOps();}
+function resetChecklist(){lsSet(ckKey(),{});renderOps();}
+
+/* --- pick order / run sheet --- */
+function renderRunSheet(){
+  const loc=state.opsLoc||"";
+  const opts=LOCATIONS.map(x=>`<option value="${x.key}"${x.key===loc?' selected':''}>${escapeHtml(x.city)} (${(ORDERS[x.key]||[]).length})</option>`).join("");
+  let arr=(ORDERS[loc]||[]).slice();
+  const rs=lsGet(runKey(loc),{});
+  if(state.runSort==="type") arr.sort((a,b)=> (a.type<b.type?-1:a.type>b.type?1:0) || (a.startMin-b.startMin));
+  else arr.sort((a,b)=> (a.startMin-b.startMin) || (a.type<b.type?-1:1));
+  const nD=arr.filter(o=>o.type==='Delivery').length, nP=arr.length-nD;
+  const tot=arr.reduce((a,b)=>a+b.amount,0);
+  const flagged=arr.filter(o=>o.amount>2000).length;
+  const pickedN=arr.filter(o=>rs[o._uid]&&rs[o._uid].done).length;
+  let html=`
+   <div class="rsctl">
+     <select class="rsdepot" onchange="opsSetLoc(this.value)">${opts||'<option>No depots loaded</option>'}</select>
+     <div class="seg rsseg">
+       <button class="${state.runSort!=='type'?'on':''}" onclick="opsSort('time')">Time</button>
+       <button class="${state.runSort==='type'?'on':''}" onclick="opsSort('type')">Type</button>
+     </div>
+   </div>
+   <div class="rsstats">
+     <div class="rsstat"><b>${arr.length}</b><span>orders</span></div>
+     <div class="rsstat"><b>${nD}</b><span>deliv</span></div>
+     <div class="rsstat"><b>${nP}</b><span>pickup</span></div>
+     <div class="rsstat"><b class="fr">${money(tot)}</b><span>total</span></div>
+     <div class="rsstat"><b class="am">${flagged}</b><span>&gt;$2k</span></div>
+   </div>
+   <div class="rspick">Pick sequence — ${state.runSort==='type'?'grouped by type, then ':''}earliest fulfillment first. Tap a row when picked. <b>${pickedN}/${arr.length} picked</b></div>`;
+  if(!arr.length){ html+=`<div class="empty-list">No orders loaded for this depot on ${prettyDate($("#date").value)}.</div>`; return html; }
+  arr.forEach((o,idx)=>{
+    const st=rs[o._uid]||{};
+    const d=o.type==='Delivery';
+    const hi=o.amount>2000;
+    html+=`<div class="rsrow${st.done?' done':''}">
+      <button class="rsnum" onclick="runToggleDone('${o._uid}')">${st.done?'✓':String(idx+1).padStart(2,'0')}</button>
+      <div class="rsmain" onclick="runToggleDone('${o._uid}')">
+        <div class="rstop"><span class="rswin">${o.win||'—'}</span>
+          <span class="typetag ${d?'d':'p'}">${o.type.toUpperCase()}</span>
+          ${hi?'<span class="flag hi">⚑ $'+Math.round(o.amount).toLocaleString()+'</span>':''}
+          ${st.pallet?'<span class="flag pl">▦ PALLET</span>':''}
+          ${st.note?'<span class="flag nt">✎ NOTE</span>':''}
+        </div>
+        <div class="rsacct">${escapeHtml(o.acct)}</div>
+        <div class="rssub">${escapeHtml(cleanCity(o.city))||'—'} · Load ${o.cases||0} · ${money(o.amount)}</div>
+        ${st.note?`<div class="rsnote">${escapeHtml(st.note)}</div>`:''}
+      </div>
+      <div class="rsact">
+        <button class="${st.pallet?'on':''}" title="Palletized" onclick="runFlag('${o._uid}','pallet')">▦</button>
+        <button class="${st.note?'on':''}" title="Special note" onclick="runNote('${o._uid}')">✎</button>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+function runGet(loc){return lsGet(runKey(loc),{});}
+function runToggleDone(uid){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};rs[uid].done=!rs[uid].done;lsSet(runKey(loc),rs);renderOps();}
+function runFlag(uid,f){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};rs[uid][f]=!rs[uid][f];lsSet(runKey(loc),rs);renderOps();}
+function runNote(uid){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};const v=prompt("Special note / substitution for this order:",rs[uid].note||"");if(v===null)return;rs[uid].note=v.trim();if(!rs[uid].note)delete rs[uid].note;lsSet(runKey(loc),rs);renderOps();}
+
+/* --- playbook --- */
+function renderPlaybook(){
+  const pri=["Safety","Accuracy","Communication","Speed","Teamwork"];
+  const fs=["Ready-to-eat / fully cooked / non-allergen","Paper & dry goods","Produce",
+    "Prepared items (e.g. chopped lettuce)","Dairy","Whole-cut proteins","Frozen",
+    "Raw chicken / ground / high-risk proteins"];
+  return `
+   <div class="pbsec"><div class="pbh">Two-man team priorities</div>
+     <div class="pbpri">${pri.map((p,i)=>`<span><b>${i+1}</b> ${p}</span>`).join("")}</div>
+   </div>
+   <div class="pbsec"><div class="pbh">Shift structure</div>
+     <div class="pbrow"><span class="pbt">4:30 AM</span> Selector 1 — setup, pull orders, build roster, start picking (Row 1000 → back)</div>
+     <div class="pbrow"><span class="pbt">5:30 AM</span> Selector 2 — download w/ Selector 1, begin picking same flow</div>
+     <div class="pbrow"><span class="pbt">6:30 AM</span> Transition — Selector 1 to checkout & staging integrity</div>
+   </div>
+   <div class="pbsec"><div class="pbh">Pallet build — food safety, top → bottom</div>
+     ${fs.map((x,i)=>`<div class="pbfs"><span>${i+1}</span>${x}</div>`).join("")}
+     <div class="pbnote">Prevent cross-contamination — maintain separation at all times. Build food-safety first, not speed.</div>
+   </div>
+   <div class="pbsec"><div class="pbh">Selector mindset</div>
+     <div class="pbnote">Accuracy is always more important than speed. No selector stands around wondering what to do next — there is always something to do. If you are unsure about anything, stop and ask before proceeding.</div>
+   </div>`;
 }
 
 /* ----------------------------- utils ----------------------------- */
@@ -925,7 +1219,7 @@ async function reload(){
 }
 
 $("#date").value=todayISO();
-$("#date").addEventListener("change",()=>{ state.sel={}; reload(); });
+$("#date").addEventListener("change",()=>{ state.sel={}; reload().then(()=>{ if(!$("#screenOps").classList.contains("hidden")) renderOps(); }); });
 $("#searchInput").addEventListener("input",e=>{state.search=e.target.value;renderList();});
 document.querySelectorAll("#sortSeg button").forEach(b=>{
   b.addEventListener("click",()=>{
