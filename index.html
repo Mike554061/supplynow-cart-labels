@@ -96,6 +96,14 @@
   .card{display:flex;align-items:stretch;gap:0;background:var(--panel);border:1px solid var(--line);
     border-radius:14px;margin-bottom:9px;overflow:hidden;transition:.12s}
   .card.sel{border-color:var(--frost);background:#16242a;box-shadow:0 0 0 1px var(--frost) inset}
+  /* run sheet: picked orders strike through */
+  .card.done{opacity:.45}
+  .card.done .acct,.card.done .win{text-decoration:line-through}
+  .card.done .chk{background:var(--frost);border-color:var(--frost)}
+  .closeout{width:100%;margin-top:14px;background:var(--frost);color:#04201d;font-weight:800;
+    border-radius:13px;padding:15px;font-size:15px}
+  .closeout:disabled{background:var(--panel);color:var(--faint)}
+  .rsnote{color:var(--faint);font-size:12px;text-align:center;margin:10px 2px 0;line-height:1.5}
   .card .stripe{width:5px;flex:none}
   .card .pick{flex:1;display:flex;align-items:center;gap:12px;padding:13px 13px 13px 12px;text-align:left;min-width:0}
   .chk{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);flex:none;
@@ -384,15 +392,25 @@
   </div>
 
   <div class="controls">
+    <span class="seglbl">Mode</span>
+    <div class="seg" id="modeSeg">
+      <button data-mode="labels" class="on">Labels</button>
+      <button data-mode="runsheet">Run sheet</button>
+    </div>
+    <button class="selall" id="selAll" onclick="toggleAll()">Select all</button>
+  </div>
+
+  <div class="controls" id="sortRow">
     <span class="seglbl">Sort</span>
     <div class="seg" id="sortSeg">
       <button data-sort="time" class="on">Delivery time</button>
       <button data-sort="amt">Order $</button>
     </div>
-    <button class="selall" id="selAll" onclick="toggleAll()">Select all</button>
   </div>
 
   <div id="orderList"></div>
+  <button class="closeout hidden" id="closeOutBtn" onclick="closeOutLocation()">Close out location</button>
+  <p class="rsnote hidden" id="rsNote">Tap an order when it's picked — it strikes through and pings dispatch.</p>
 </div>
 
 <!-- SCREEN 3 -->
@@ -679,9 +697,50 @@ let state = {
   loc:null,
   sort:"time",
   search:"",
-  sel:{},          // id -> cartCount
+  mode:"labels",   // "labels" (print) | "runsheet" (mark picked -> pings dispatch)
+  sel:{},          // uid -> label count
+  done:{},         // uid -> completion ms (run sheet)
   queue:[],        // built labels for preview
 };
+
+/* ------------------- run sheet: dispatch notifications ------------------- */
+// Posts to the SupplyNow Delivery Notifier, which DMs Mike / Edward / Melissa.
+const NOTIFY_URL = "https://supplynow-delivery-notifier.onrender.com/selection-complete";
+
+function notifySelection(payload){
+  // fire-and-forget; a failed ping must never block the selector
+  try{
+    fetch(NOTIFY_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)}).catch(e=>console.warn("notify failed:",e));
+  }catch(e){ console.warn("notify error:",e); }
+}
+function locName(){ const L=LOCATIONS.find(x=>x.key===state.loc); return L?L.city:(state.loc||""); }
+function doneKey(){ return "sn_done_"+String(loadedDate||"").replace(/\//g,"-")+"_"+(state.loc||""); }
+function loadDone(){ try{ state.done=JSON.parse(localStorage.getItem(doneKey())||"{}"); }catch(e){ state.done={}; } }
+function saveDone(){ try{ localStorage.setItem(doneKey(),JSON.stringify(state.done)); }catch(e){} }
+
+// tap an order in run-sheet mode -> strike through + ping dispatch
+function markDone(uid){
+  const ord=findOrder(uid); if(!ord) return;
+  if(state.done[uid]){ delete state.done[uid]; }        // untick: no ping
+  else{
+    state.done[uid]=Date.now();
+    notifySelection({kind:"order", account:ord.acct, location:locName(), ready_by:ord.win||""});
+  }
+  saveDone(); renderList();
+}
+
+function closeOutLocation(){
+  const btn=$("#closeOutBtn");
+  notifySelection({kind:"location", location:locName()});
+  btn.disabled=true; btn.textContent="Closed out ✓";
+}
+
+function setMode(m){
+  state.mode=m;
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
+  renderList();
+}
 
 /* ----------------------------- helpers ----------------------------- */
 const $=s=>document.querySelector(s);
@@ -730,6 +789,8 @@ function renderLocations(){
 
 function openLocation(key){
   state.loc=key;state.search="";state.sel={};
+  loadDone();                                   // restore this location's picked orders
+  const btn=$("#closeOutBtn"); btn.disabled=true; btn.textContent="Close out location";
   $("#searchInput").value="";
   const L=LOCATIONS.find(x=>x.key===key);
   $("#listTitle").textContent=L.city;
@@ -768,15 +829,18 @@ function renderList(){
     wrap.innerHTML=`<div class="empty-list">No orders for this location on ${prettyDate($("#date").value)}.</div>`;
   }
 
+  const runsheet = state.mode==="runsheet";
   arr.forEach(ord=>{
-    const sel=state.sel[ord._uid]!==undefined;
+    const uid=ord._uid;
+    const sel=state.sel[uid]!==undefined;
+    const isDone=!!state.done[uid];
     const d=ord.type==="Delivery";
     const card=document.createElement("div");
-    card.className="card"+(sel?" sel":"");
+    card.className="card"+(runsheet ? (isDone?" done":"") : (sel?" sel":""));
     card.innerHTML=`
       <div class="stripe" style="background:${d?'var(--delivery)':'var(--pickup)'}"></div>
-      <button class="pick" onclick="toggleSel('${ord._uid}')">
-        <div class="chk">${sel?'✓':''}</div>
+      <button class="pick" onclick="${runsheet?`markDone('${uid}')`:`toggleSel('${uid}')`}">
+        <div class="chk">${(runsheet?isDone:sel)?'✓':''}</div>
         <div class="meta">
           <div class="acct">${escapeHtml(ord.acct)}</div>
           <div class="line2">
@@ -787,9 +851,24 @@ function renderList(){
       </button>`;
     wrap.appendChild(card);
   });
-  updateAction();
-  // sync select-all label
-  $("#selAll").textContent = (all.length>0 && all.every(x=>state.sel[x._uid]!==undefined)) ? "Clear all":"Select all";
+
+  // mode chrome
+  $("#selAll").classList.toggle("hidden", runsheet);
+  $("#closeOutBtn").classList.toggle("hidden", !runsheet || all.length===0);
+  $("#rsNote").classList.toggle("hidden", !runsheet);
+  if(runsheet){
+    const picked=all.filter(x=>state.done[x._uid]).length;
+    const allDone=all.length>0 && picked===all.length;
+    const btn=$("#closeOutBtn");
+    if(!btn.textContent.includes("✓")){
+      btn.disabled=!allDone;
+      btn.textContent = allDone ? `Close out ${locName()}` : `Close out ${locName()} — ${picked}/${all.length} picked`;
+    }
+    $("#actionBar").classList.add("hidden");
+  }else{
+    updateAction();
+    $("#selAll").textContent = (all.length>0 && all.every(x=>state.sel[x._uid]!==undefined)) ? "Clear all":"Select all";
+  }
 }
 
 function toggleSel(uid){
@@ -1363,6 +1442,9 @@ document.querySelectorAll("#sortSeg button").forEach(b=>{
     document.querySelectorAll("#sortSeg button").forEach(x=>x.classList.remove("on"));
     b.classList.add("on");state.sort=b.dataset.sort;renderList();
   });
+});
+document.querySelectorAll("#modeSeg button").forEach(b=>{
+  b.addEventListener("click",()=>setMode(b.dataset.mode));
 });
 $("#confirmScrim").addEventListener("click",e=>{if(e.target.id==="confirmScrim")closeConfirm();});
 reload();
