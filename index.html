@@ -1038,60 +1038,24 @@ function runKey(loc){return "sn_run_"+($("#date").value||"x")+"_"+(loc||"");}
 
 // the daily accountability checklist — sourced from the Selection Operations Rundown
 const CHECKLIST=[
- {ph:"Arrival", time:"4:30–4:35 AM", ac:"var(--frost)", items:[
-   {id:"a1",t:"Clock in"},
-   {id:"a2",t:"Put personal belongings away"},
-   {id:"a3",t:"Pull ALL orders for the day — JSS ▸ Online Orders ▸ Rest Depot / JetRod ▸ all orders for date"},
-   {id:"a4",t:"Check Slack for order adjustments / add-ons"},
-   {id:"a5",t:"Management check-in (Depot or SN Ops): confirm order count + who's where & when"},
+ {ph:"Pre-Picking & Equipment", time:"before you pick", ac:"var(--frost)", link:1, items:[
+   {id:"p1",t:"Clock in"},
+   {id:"p2",t:"Log in: tinyurl.com/SNselection — start the daily checklist, review the pick list & adjustments, print order labels"},
+   {id:"p3",t:"Log in: JSS — compare against your physical pick tickets"},
+   {id:"p4",t:"Equipment ready: pallet jack, pallet wrap, pallets, pens, highlighters, empty boxes, green & red order markers"},
  ]},
- {ph:"Build the roster", time:"before you pick", ac:"var(--amber)", link:1, items:[
-   {id:"r1",t:"Sort by fulfillment type (Pickup / Delivery)"},
-   {id:"r2",t:"Sort by fulfillment time — first to last"},
-   {id:"r3",t:"Flag orders over $2,000"},
-   {id:"r4",t:"Flag large-item buys (20+ of a single item)"},
-   {id:"r5",t:"Flag special notes / palletized orders"},
-   {id:"r6",t:"Confirm count of total orders → open the Pick Order tab"},
+ {ph:"Physical Picking & Verification", time:"the pick", ac:"var(--delivery)", items:[
+   {id:"v1",t:"Locate the first item by exact aisle, rack, shelf & bin number"},
+   {id:"v2",t:"Verify the item — description, item # & SKU — place the barcode facing out"},
+   {id:"v3",t:"Pick the exact quantity — never over-pick or under-pick"},
+   {id:"v4",t:"Inspect for damage, expiration or leaks before placing in the cart / pallet"},
+   {id:"v5",t:"Confirm the pick: every item checked · OOS → circle the line with OOS code + PO date · subs → write it in"},
  ]},
- {ph:"Equipment check", time:"4:35–4:40 AM", ac:"var(--frost)", items:[
-   {id:"e1",t:"Unlock garage door"},
-   {id:"e2",t:"Grab shopping carts"},
-   {id:"e3",t:"Pallet wrap + pens ready"},
-   {id:"e4",t:"Print cart labels for each order (Labels screen)"},
- ]},
- {ph:"Selection flow", time:"the pick", ac:"var(--delivery)", items:[
-   {id:"s1",t:"Pick each order Row 1000 → back, keep like items grouped"},
-   {id:"s2",t:"Break case: pull single units, UPC facing out"},
-   {id:"s3",t:"Label each cart immediately, stage in pick sequence"},
-   {id:"s4",t:"Multi-cart orders stay grouped"},
-   {id:"s5",t:"Every item checked ✔ · OOS circled + reason + PO date · subs written on the row"},
-   {id:"s6",t:"Group carts per order, pick sheet in front, cart count noted (e.g. 4 carts)"},
- ]},
- {ph:"5:30 — Selector 2 handoff", time:"5:30 AM", ac:"var(--pickup)", items:[
-   {id:"h1",t:"Debrief: order updates, adjustments, known OOS, active issues"},
-   {id:"h2",t:"Confirm OOS photos already sent to customer support"},
-   {id:"h3",t:"Selector 2 begins — same standardized flow"},
- ]},
- {ph:"6:30 — Checkout & staging", time:"6:30 AM", ac:"var(--frost)", items:[
-   {id:"c1",t:"Selector 1 stops picking → owns staging integrity"},
-   {id:"c2",t:"Separate staging: Pickup vs Delivery"},
-   {id:"c3",t:"Palletize multi-cart delivery orders"},
-   {id:"c4",t:"Consolidate broken-case / singles into bins or boxes"},
-   {id:"c5",t:"Build pallets food-safety first (see Playbook)"},
- ]},
- {ph:"Downtime (if early)", time:"as needed", ac:"var(--faint)", items:[
-   {id:"d1",t:"Help another selector"},
-   {id:"d2",t:"Consolidate the staging area"},
-   {id:"d3",t:"Pull tomorrow's supplies"},
-   {id:"d4",t:"Clean coolers"},
-   {id:"d5",t:"Organize carts / ask for next assignment"},
- ]},
- {ph:"End of shift", time:"clock out", ac:"var(--amber)", items:[
-   {id:"z1",t:"Staging cleared of empty carts, pallets, trash"},
-   {id:"z2",t:"Check with Depot: order accuracy + product put back"},
-   {id:"z3",t:"All orders staged — drivers to load, pickups for customers"},
-   {id:"z4",t:"Report any shortages"},
-   {id:"z5",t:"Clock out"},
+ {ph:"Staging & Handoff", time:"close out", ac:"var(--amber)", items:[
+   {id:"g1",t:"Build the load for food hierarchy — heavy on the bottom, fragile on top, organized for checkout"},
+   {id:"g2",t:"Label each cart with the correct order label — more than two carts auto-palletizes"},
+   {id:"g3",t:"Stage the order in its designated staging lane"},
+   {id:"g4",t:"Close out the pick list & checklist on SNselection to notify dispatch & driver teams"},
  ]},
 ];
 
