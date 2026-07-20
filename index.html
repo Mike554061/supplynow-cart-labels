@@ -1255,7 +1255,7 @@ function renderRunSheet(){
    </div>
    <div class="rspick">${
      state.runSort==='manual'?'Manual order — drag the ⠿ handle to re-sequence. <button class="rsreset" onclick="opsResetOrder()">Reset to Auto</button>':
-     state.runSort==='smart'?'Pick order — by time slot, then $2k+ deliveries, pickups, rest (largest→smallest). Drag the ⠿ handle to override.':
+     state.runSort==='smart'?'Pick order — by time slot, then $3k+ pickups, $2k+ deliveries, pickups, rest (largest→smallest). Drag the ⠿ handle to override.':
      state.runSort==='type'?'Grouped by type, then earliest fulfillment first.':'Earliest fulfillment first.'
    } Tap a row when picked. <b>${pickedN}/${arr.length} picked</b></div>`;
   if(!arr.length){ html+=`<div class="empty-list">No orders loaded for this depot on ${prettyDate($("#date").value)}.</div>`; return html; }
@@ -1284,11 +1284,12 @@ function renderRunSheet(){
   });
   return html;
 }
-// pick-order tier within a time slot: 0 = delivery over $2k, 1 = pickup, 2 = the rest (delivery <= $2k)
+// pick-order tier within a time slot: 0 = pickup >$3k, 1 = delivery >$2k, 2 = other pickups, 3 = other deliveries
 function pickRank(o){
-  if(o.type==='Delivery' && o.amount>2000) return 0;
-  if(o.type==='Pickup') return 1;
-  return 2;
+  if(o.type==='Pickup'   && o.amount>3000) return 0;   // pickups over $3,000 — first priority
+  if(o.type==='Delivery' && o.amount>2000) return 1;   // deliveries over $2,000
+  if(o.type==='Pickup')                    return 2;   // remaining pickups
+  return 3;                                            // remaining deliveries (<= $2,000)
 }
 function runGet(loc){return lsGet(runKey(loc),{});}
 function runToggleDone(uid){const loc=state.opsLoc;const rs=runGet(loc);rs[uid]=rs[uid]||{};rs[uid].done=!rs[uid].done;lsSet(runKey(loc),rs);renderOps();}
