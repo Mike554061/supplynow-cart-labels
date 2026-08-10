@@ -30,7 +30,7 @@
     const url = (await r.text()).trim();
     if (/^https:\/\/[^\s]+$/.test(url)) {
       // cache-bust the chat so a device never serves a stale copy of it
-      location.replace(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now());
+      location.replace('chat.html?v=' + Date.now() + '#api=' + encodeURIComponent(url));
       return;
     }
     throw new Error('bad url');
