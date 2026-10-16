@@ -313,7 +313,8 @@ const VERIFY = (() => {
     return `<div class="ln ${lineClass(c)}${isComplete(c) ? " complete" : ""}" id="ln-${l.line}">
       <div class="lnhead"><span class="bin">BIN ${esc(l.bin || "—")}</span><span>#${esc(l.item)}</span>
         <span class="upc">UPC ${esc(upc.slice(0, -5))}<b>${esc(upc.slice(-5))}</b></span></div>
-      <div class="lndesc">${esc(l.desc)}</div>
+      <div class="lnitem">${l.img ? `<button class="lnimg" onclick="VERIFY.showImg(${l.line})" aria-label="Show photo of ${esc(l.desc)}"><img src="${esc(l.img)}" alt="" loading="lazy"></button>` : ""}
+        <div class="lndesc">${esc(l.desc)}</div></div>
       ${l.note ? `<div class="lnsub">${esc(l.note)}</div>` : ""}
       <div class="lnrow">
         <div class="lnqty"><b>${fmtQty(l.qty)}</b><span>${esc(unit)}</span></div>
@@ -506,10 +507,17 @@ const VERIFY = (() => {
     await save(l.line, { scan_status: status, scanned_code: code, photo_b64: photo || undefined });
     showQtyPrompt(l, already ? "Already scanned" : "Found");
   }
+  function showImg(line) {
+    const l = lineOf(line); if (!l || !l.img) return;
+    let o = el("imgView");
+    if (!o) { document.body.insertAdjacentHTML("beforeend", `<div class="imgview" id="imgView" role="dialog" aria-label="Product photo"></div>`); o = el("imgView"); }
+    o.innerHTML = `<img src="${esc(l.img)}" alt="${esc(l.desc)}"><div class="cap">${esc(l.desc)}<br>UPC ${esc(l.upc)} · BIN ${esc(l.bin)} · #${esc(l.item)}</div><button type="button">Close</button>`;
+    o.onclick = () => o.remove();
+  }
   function showQtyPrompt(l, title) {
     S.scan.prompt = { line: l.line, step: null };
     const c = check(l.line);
-    scanMsg("ok", `<span class="big">✓ ${esc(title)} · BIN ${esc(l.bin)}</span>${esc(l.desc)}<br>Ordered <b>${fmtQty(l.qty)} ${esc(unitOf(l))}</b>${c.qty_status ? ` · qty already ${c.qty_status === "ok" ? "confirmed" : c.qty_status}` : ""}
+    scanMsg("ok", `${l.img ? `<img class="simg" src="${esc(l.img)}" alt="">` : ""}<span class="big">✓ ${esc(title)} · BIN ${esc(l.bin)}</span>${esc(l.desc)}<br>Ordered <b>${fmtQty(l.qty)} ${esc(unitOf(l))}</b>${c.qty_status ? ` · qty already ${c.qty_status === "ok" ? "confirmed" : c.qty_status}` : ""}
       <div class="qrow"><button class="ok" onclick="VERIFY.scanQty('ok')">✓ ${fmtQty(l.qty)}</button>
       <button onclick="VERIFY.scanQty('less')">&lt; Less</button><button onclick="VERIFY.scanQty('more')">&gt; More</button></div>`);
   }
@@ -595,7 +603,7 @@ const VERIFY = (() => {
     </div>`);
   });
 
-  return { enabled, source, loadWarehouse, badge, syncBadges, openOrder, back, render, setFilter, setSort,
+  return { showImg, enabled, source, loadWarehouse, badge, syncBadges, openOrder, back, render, setFilter, setSort,
            qtyOk, qtyAdj, adjStep, adjInput, adjReason, adjCancel, adjSave, markPicked, undoPicked, cancelConfirm,
            scanLine, scanAll, closeScanner, resumeCam, scanQty, scanQtySave, typeUPC, onPhoto, savePhotoOnly,
            _upcMatch: upcMatch, _simScan: code => onDecoded(code, null, "camera") };   // _ = test hooks
