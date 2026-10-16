@@ -8,6 +8,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- VERIFY: order verification layer (open an order, check each line's qty, scan its UPC) -->
+<script>window.CART_VERIFY = {"mode": "prod", "api": "https://donated-faceted-causing.ngrok-free.dev/cart/", "rollout": "off"};</script>
+<link rel="stylesheet" href="verify.css" />
+<script src="verify.js"></script>
 <style>
   :root{
     --ink:#0E1419; --panel:#161F27; --panel2:#1B2730; --line:#2A3742;
@@ -456,6 +460,9 @@
 <!-- SCREEN 4: DAILY RUN SHEET -->
 <div id="screenOps" class="wrap hidden"></div>
 
+<!-- VERIFY SCREEN: one order, line by line (qty + UPC scan) -->
+<div id="screenVerify" class="wrap hidden"></div>
+
 <!-- FOOTER ACTION -->
 <div class="actionbar hidden" id="actionBar">
   <div class="inner">
@@ -864,6 +871,7 @@ function renderList(){
   }
 
   const runsheet = state.mode==="runsheet";
+  const vOn = runsheet && typeof VERIFY!=="undefined" && VERIFY.enabled();   // VERIFY: tap opens the order
   arr.forEach(ord=>{
     const uid=ord._uid;
     const sel=state.sel[uid]!==undefined;
@@ -873,18 +881,24 @@ function renderList(){
     card.className="card"+(runsheet ? (isDone?" done":"") : (sel?" sel":""));
     card.innerHTML=`
       <div class="stripe" style="background:${d?'var(--delivery)':'var(--pickup)'}"></div>
-      <button class="pick" onclick="${runsheet?`markDone('${uid}')`:`toggleSel('${uid}')`}">
-        <div class="chk">${(runsheet?isDone:sel)?'✓':''}</div>
+      <button class="pick" onclick="${vOn?`VERIFY.openOrder('${uid}','list')`:runsheet?`markDone('${uid}')`:`toggleSel('${uid}')`}">
+        <div class="chk${vOn?' tap':''}"${vOn?` onclick="event.stopPropagation();markDone('${uid}')" title="Mark picked"`:''}>${(runsheet?isDone:sel)?'✓':''}</div>
         <div class="meta">
           <div class="acct">${escapeHtml(ord.acct)}</div>
           <div class="line2">
             <span class="win">${ord.win||'—'}</span>
             <span class="typetag ${d?'d':'p'}">${ord.type.toUpperCase()}</span>
+            ${vOn?VERIFY.badge(ord):''}
           </div>
         </div>
+        ${vOn?'<span class="open" aria-hidden="true">›</span>':''}
       </button>`;
     wrap.appendChild(card);
   });
+  if(vOn){   // VERIFY: progress badges + the run-sheet hint
+    VERIFY.syncBadges(arr);
+    $("#rsNote").textContent="Tap an order to open and verify it line by line. Tap the box when it's picked: it strikes through and pings dispatch.";
+  }
 
   // mode chrome
   $("#selAll").classList.toggle("hidden", runsheet);
@@ -1162,6 +1176,7 @@ function show(which){
   $("#screenList").classList.toggle("hidden",which!=="list");
   $("#screenPreview").classList.toggle("hidden",which!=="preview");
   $("#screenOps").classList.toggle("hidden",which!=="ops");
+  $("#screenVerify").classList.toggle("hidden",which!=="verify");   // VERIFY
   $("#actionBar").classList.toggle("hidden",which!=="list"||Object.keys(state.sel).length===0);
   window.scrollTo(0,0);
 }
