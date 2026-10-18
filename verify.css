@@ -202,3 +202,6 @@ body.verifying .livefab{display:none}
 .lnsub.addon{color:var(--amber);font-weight:700}
 .addon-x{margin-left:8px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;color:var(--dim);font-size:11px}
 .addonchip{color:var(--amber);border-color:#5a4710}
+
+/* unit / case under each quantity: the app's yellow (same as the substitution note) */
+.lnqty span{color:var(--amber)}
