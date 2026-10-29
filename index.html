@@ -626,6 +626,9 @@ function minToTime(m){
 }
 // afternoon fix: a 1:00–1:59 AM fulfillment is really 1 PM (the feed drops the PM) — flip it forward 12h
 function flip1am(sm){ return (sm>=60 && sm<120) ? sm+720 : sm; }
+// the feed's raw Start is a Sheets time cell ("Sat Dec 30 1899 14:00:00 GMT-0500"): a 24-hour clock, so read it
+// directly. The feed's own startMin wraps the hour (noon -> 0, 2 PM -> 2 AM).
+function minutesFromCell(t){ const m=String(t||"").match(/\s(\d{2}):(\d{2}):\d{2} GMT[+-]\d{4}/); return m ? (+m[1])*60 + (+m[2]) : 0; }
 function cityFromAddress(a){
   const p=String(a||"").split(",").map(s=>s.trim()).filter(Boolean);
   return p[1]||p[0]||"";      // "street, CITY, ST, zip" -> CITY
@@ -671,7 +674,7 @@ function buildFromRows(rows){ groupOrders(rows.map(rowToOrder)); }
 function buildFromFeed(resp){
   loadedDate = String(resp.date||"").trim();
   groupOrders((resp.orders||[]).map(o=>{
-    const sm=flip1am(Number(o.startMin)||minutesFromTime(o.win));
+    const sm=flip1am(minutesFromCell(o.win)||Number(o.startMin)||minutesFromTime(o.win));
     return {
       id:String(o.id||"").trim(),
       acct:String(o.acct||"—"),
