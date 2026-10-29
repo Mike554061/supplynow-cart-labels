@@ -149,6 +149,7 @@
   .empty-list{text-align:center;color:var(--faint);padding:50px 20px;font-size:14px}
   .loadstate{grid-column:1/-1;text-align:center;color:var(--dim);padding:44px 20px;font-size:14px;line-height:1.6}
   .loadstate.err{color:var(--amber)}
+  .boardnote{grid-column:1/-1;color:var(--dim);font-size:12px;line-height:1.5;padding:0 2px 4px}
   .loadstate .retry{display:inline-block;margin-top:12px;background:var(--frost);color:#04201d;
     font-weight:800;border-radius:10px;padding:10px 18px;font-size:13px}
 
@@ -554,6 +555,9 @@ const CONFIG = {
   // Locked feed: read-only Apps Script web app that returns ONLY label fields (no emails/PII).
   // Once deployed, paste its /exec URL here — the app uses it and the sheet can go private.
   FEED_URL:  "https://script.google.com/macros/s/AKfycbwPFGlLlxbPrzO5_DwH3fQrDJGhieWYVdpVm6XrlMil4l8sYJw269vMQFerQtXwtDz1bw/exec",
+  // Next-Day Board (depot@ Apps Script, a copy of the parser): tomorrow's board, built 9:00–9:30 AM in its
+  // own sheet. The date chip reads it for a picked date the live board isn't on. Empty = chip stays on the live board.
+  NEXT_FEED_URL: "https://script.google.com/macros/s/AKfycbx3O27e08nSxsa_6CAtYTatHEUtSzEzl999ZS3vQ0-YtbwRJvfg773aewUcnIiAW9VWyg/exec",
   // Run Sheet endpoint (Apps Script web app): stores Special Instructions for dispatch→selection sync
   // and sends the START + COMPLETE emails. Paste the deployed /exec URL here — until then the app runs
   // fully local (no sync, no email). See the "SupplyNow Run Sheet" Apps Script.
@@ -572,6 +576,8 @@ const CONFIG = {
 let ORDERS = {};
 let loadStatus = "idle";     // idle | loading | ok | error | mock
 let loadedDate = "";         // MM/DD/YYYY the current Routing_Date batch is for
+let datePicked = false;      // true once someone changes the date chip; until then it follows the live board
+let boardNote = "";          // line above the depot tiles: next-day board, or no board for the picked date
 
 // stamp a unique key on every order — order numbers can repeat / be blank across rows
 function stampUids(map){
@@ -704,8 +710,23 @@ async function loadOrders(iso){
   if(CONFIG.FEED_URL){
     loadStatus="loading"; renderLocations();
     try{
-      const resp=await jsonp(CONFIG.FEED_URL);
+      let resp=await jsonp(CONFIG.FEED_URL);
       if(!resp||resp.ok===false) throw new Error((resp&&resp.error)||"bad feed");
+      boardNote="";
+      // date chip: a picked date the live board isn't on comes from the Next-Day Board
+      if(datePicked && iso && mdyToISO(resp.date)!==iso){
+        const nx=CONFIG.NEXT_FEED_URL ? await jsonp(CONFIG.NEXT_FEED_URL).catch(()=>null) : null;
+        const nxOk=!!(nx && nx.ok!==false);
+        if(nxOk && mdyToISO(nx.date)===iso){
+          resp=nx;
+          const t=nx.built ? new Date(nx.built).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}) : "";
+          boardNote=`Next-day board${t?` · built ${t}`:""}. Orders placed after that show up on the evening board (Daily Team Update).`;
+        }else{
+          const have=[...new Set([mdyToISO(resp.date), nxOk?mdyToISO(nx.date):""].filter(Boolean))];
+          resp={date:"",orders:[]};
+          boardNote=`No board for ${prettyDate(iso)}. Boards on hand: ${have.map(prettyDate).join(", ")||"none"}. The next day's board is built by 10 AM.`;
+        }
+      }
       buildFromFeed(resp); loadStatus="ok";
     }catch(e){ ORDERS={}; LOCATIONS=[]; loadStatus="error"; console.warn("feed failed:",e); }
     return;
@@ -804,10 +825,14 @@ function renderLocations(){
     g.innerHTML=`<div class="loadstate err">Couldn't reach the live order feed.<br>
       <button class="retry" onclick="reload()">Retry</button></div>`;return;
   }
+  if(LOCATIONS.length===0 && boardNote){
+    g.innerHTML=`<div class="loadstate">${escapeHtml(boardNote)}</div>`;return;
+  }
   if(LOCATIONS.length===0){
     g.innerHTML=`<div class="loadstate">No orders loaded${loadedDate?` for ${loadedDate}`:""}.<br>
       <span style="color:var(--faint);font-size:12px">Run the parser (Research All Locations → Secondary Completion) for this date, then reopen.</span></div>`;return;
   }
+  if(boardNote){ const n=document.createElement("div"); n.className="boardnote"; n.textContent=boardNote; g.appendChild(n); }
   LOCATIONS.forEach(L=>{
     const list=ORDERS[L.key]||[];
     const tot=list.reduce((a,b)=>a+b.amount,0);
@@ -1515,13 +1540,13 @@ function mdyToISO(s){const m=String(s||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/
 // read the current parsed batch, then repaint whichever screen is showing
 async function reload(){
   await loadOrders($("#date").value);
-  if(loadedDate){ const iso=mdyToISO(loadedDate); if(iso) $("#date").value=iso; }  // chip follows the loaded batch
+  if(loadedDate && !datePicked){ const iso=mdyToISO(loadedDate); if(iso) $("#date").value=iso; }  // chip follows the live board until someone picks a date
   renderLocations();
   if(!$("#screenList").classList.contains("hidden")) renderList();
 }
 
 $("#date").value=todayISO();
-$("#date").addEventListener("change",()=>{ state.sel={}; reload().then(()=>{ if(!$("#screenOps").classList.contains("hidden")) renderOps(); }); });
+$("#date").addEventListener("change",()=>{ state.sel={}; datePicked=true; reload().then(()=>{ if(!$("#screenOps").classList.contains("hidden")) renderOps(); }); });
 $("#searchInput").addEventListener("input",e=>{state.search=e.target.value;renderList();});
 document.querySelectorAll("#sortSeg button").forEach(b=>{
   b.addEventListener("click",()=>{
