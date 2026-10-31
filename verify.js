@@ -23,6 +23,7 @@ const VERIFY = (() => {
   const API = CFG.api;
   const SRC_KEY = "sn_dev_source", WHO_KEY = "sn_verify_who", QUEUE_KEY = "sn_verify_queue";
   const KEY_KEY = "sn_verify_key", DEVICE_KEY = "sn_verify_device";
+  const LEGACY_KEY = "sn_verify_legacy_visual";   // the server predates scan_status "visual" (batch quick check)
   const SCANNER_LIB = "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
   const S = { cur: null, summary: {}, summaryAt: {}, scan: null, scanner: null, fileScanner: null,
               lastCode: "", lastAt: 0, log: [], photos: {} };
@@ -59,6 +60,10 @@ const VERIFY = (() => {
       }
     } catch (e) {}
   })();
+  // a phone that met a pre-batch server sends checks by sight in the old form; once the server reports "visual", stop
+  if (PROD && ls.get(LEGACY_KEY, false))
+    fetch(API + "health", { cache: "no-store" }).then(r => r.json())
+      .then(r => { if (r && (r.features || []).includes("visual")) ls.set(LEGACY_KEY, false); }).catch(() => {});
   function enabled() {
     if (!PROD) return true;
     const device = ls.get(DEVICE_KEY, "");
@@ -183,7 +188,11 @@ const VERIFY = (() => {
   }
 
   /* ---------- per-line state ---------- */
-  const isScanned = c => c.scan_status === "match" || c.scan_status === "manual";
+  // "visual" = checked by sight in a batch pick's quick check (no barcode). A server from before Oct 30, 2026
+  // doesn't know that status, so those lines are stored as manual + scanned_code BATCH-CHECK instead.
+  const isVisual = c => c.scan_status === "visual" || (c.scan_status === "manual" && c.scanned_code === "BATCH-CHECK");
+  const isScanned = c => (c.scan_status === "match" || c.scan_status === "manual") && !isVisual(c);
+  const isSub = c => !!c.sub_item || /^Substitut/i.test(c.note || "");
   function check(line) { return (S.cur.data.checks[String(line)] = S.cur.data.checks[String(line)] || {}); }
   function lineOf(n) { return S.cur.data.lines.find(l => l.line === n); }
   function lineClass(c) {
@@ -193,9 +202,10 @@ const VERIFY = (() => {
     if (c.qty_status === "ok") return "st-ok";
     return "";
   }
-  // done = quantity confirmed and item scanned; an out-of-stock line (less, 0) has nothing to scan
-  const isComplete = c => !!c.qty_status && (isScanned(c) || (c.qty_status === "less" && Number(c.actual_qty) === 0));
-  const isException = c => c.qty_status === "less" || c.qty_status === "more" || c.scan_status === "mismatch";
+  // done = quantity confirmed and item scanned (or checked by sight in a batch pick); an out-of-stock line
+  // (less, 0) has nothing to scan
+  const isComplete = c => !!c.qty_status && (isScanned(c) || isVisual(c) || (c.qty_status === "less" && Number(c.actual_qty) === 0));
+  const isException = c => c.qty_status === "less" || c.qty_status === "more" || c.scan_status === "mismatch" || isSub(c);
   function summary() {
     const L = S.cur.data.lines, out = { total: L.length, qty: 0, scanned: 0, complete: 0, clean: 0, exceptions: 0 };
     L.forEach(l => {
@@ -211,19 +221,31 @@ const VERIFY = (() => {
   function unitOf(l) { return l.qty_unit || l.unit || ""; }
 
   /* ---------- saving (optimistic; queued on the phone if the server can't be reached) ---------- */
+  const legacyBody = b => b.scan_status === "visual" ? Object.assign({}, b, { scan_status: "manual", scanned_code: "BATCH-CHECK" }) : b;
+  async function postCheck(body) {
+    const send = ls.get(LEGACY_KEY, false) ? legacyBody(body) : body;
+    let r = await postJSON("verify", send);
+    if (!r.ok && send.scan_status === "visual" && /scan_status/.test(r.error || "")) {
+      ls.set(LEGACY_KEY, true);
+      r = await postJSON("verify", legacyBody(body));
+    }
+    return r;
+  }
+  async function saveCheck(body) {     // one line check to the server: the saved row, or null when it was queued
+    await flushQueue();
+    try {
+      const r = await postCheck(body);
+      if (!r.ok) throw new Error(r.error);
+      return r.check;
+    } catch (e) { queuePush(body); return null; }
+  }
   async function save(line, fields) {
     const c = check(line);
     Object.assign(c, fields);
     if (fields.photo_b64) { c.photo_local = fields.photo_b64; delete c.photo_b64; }
     render();
-    const body = Object.assign({ order: S.cur.data.order.order_number, line, who: who() }, fields);
-    await flushQueue();
-    try {
-      const r = await postJSON("verify", body);
-      if (!r.ok) throw new Error(r.error);
-      Object.assign(c, r.check);
-      if (r.check.photo) delete c.photo_local;
-    } catch (e) { queuePush(body); }
+    const saved = await saveCheck(Object.assign({ order: S.cur.data.order.order_number, line, who: who() }, fields));
+    if (saved) { Object.assign(c, saved); if (saved.photo) delete c.photo_local; }
     render();
   }
   function queuePush(body) {
@@ -235,7 +257,7 @@ const VERIFY = (() => {
     const q = ls.get(QUEUE_KEY, []);
     if (!q.length) return;
     const left = [];
-    for (const b of q) { try { const r = await postJSON("verify", b); if (!r.ok) left.push(b); } catch (e) { left.push(b); } }
+    for (const b of q) { try { const r = await postCheck(b); if (!r.ok) left.push(b); } catch (e) { left.push(b); } }
     ls.set(QUEUE_KEY, left);
   }
 
@@ -271,7 +293,7 @@ const VERIFY = (() => {
     return S.cur.data.lines.map(l => ({ l, c: S.cur.data.checks[String(l.line)] || {} }))
       .filter(x => isException(x.c))
       .map(({ l, c }) => ({ line: l.line, item: l.item, desc: l.desc, ordered: l.qty, actual: c.actual_qty,
-        qty_status: c.qty_status, scan_status: c.scan_status, scanned_code: c.scanned_code, note: c.note }));
+        qty_status: c.qty_status, scan_status: c.scan_status, scanned_code: c.scanned_code, note: c.note, sub_item: c.sub_item || null }));
   }
   function isMarkedDone() {
     const uid = S.cur.uid;
@@ -308,10 +330,12 @@ const VERIFY = (() => {
     if (c.qty_status === "less") chips.push(`<span class="chip less">Short · ${fmtQty(c.actual_qty)} of ${fmtQty(l.qty)}</span>`);
     if (c.qty_status === "more") chips.push(`<span class="chip more">Over · ${fmtQty(c.actual_qty)} of ${fmtQty(l.qty)}</span>`);
     if (c.scan_status === "match") chips.push(`<span class="chip ok">UPC ✓ scanned</span>`);
-    if (c.scan_status === "manual") chips.push(`<span class="chip ok">UPC ✓ typed</span>`);
+    if (c.scan_status === "manual" && !isVisual(c)) chips.push(`<span class="chip ok">UPC ✓ typed</span>`);
+    if (isVisual(c)) chips.push(`<span class="chip ok">Checked ✓ batch</span>`);
+    if (c.sub_item) chips.push(`<span class="chip less">Sub · ${esc(c.sub_item)}</span>`);
     if (c.scan_status === "mismatch") chips.push(`<span class="chip bad">UPC ✗ ${esc(c.scanned_code || "")}</span>`);
     if (c.scan_status === "photo") chips.push(`<span class="chip">Photo only, not read</span>`);
-    if (c.note && c.qty_status !== "ok") chips.push(`<span class="chip">${esc(c.note)}</span>`);
+    if (c.note && (c.qty_status !== "ok" || isSub(c)) && !c.sub_item) chips.push(`<span class="chip">${esc(c.note)}</span>`);
     const src = c.photo_local || photoSrc(c.photo);
     if (src) chips.push(`<a href="${esc(src)}" target="_blank" rel="noopener"><img class="thumb" src="${esc(src)}" alt="Scan photo, line ${l.line}"></a>`);
     const a = S.cur.adj && S.cur.adj.line === l.line ? S.cur.adj : null;
@@ -525,7 +549,7 @@ const VERIFY = (() => {
     for (let k = 1; k <= L.length; k++) { const l = L[(i + k + L.length) % L.length]; if (!isComplete(check(l.line))) return l.line; }
     return null;
   }
-  async function wakeLock(on) {         // keep the screen on while picking
+  async function wakeLock(on) {         // keep the screen on while picking (batch.js uses it too)
     try {
       if (on && navigator.wakeLock && !S.wake) S.wake = await navigator.wakeLock.request("screen");
       if (!on && S.wake) { await S.wake.release(); S.wake = null; }
@@ -725,5 +749,8 @@ const VERIFY = (() => {
            scanLine, scanAll, closeScanner, torch, typeLast5, onPhoto,
            pickQty, pickStep, pickInput, pickReason, pickAdjCancel, pickAdjSave, pickSkip, pickMarkWrong,
            addonOpen, addonClose, addonField, addonLookup, addonPick, addonSave, removeAddon,
+           // batch.js (batch picking) reuses this file's connection: device key, legacy fallback, offline queue
+           net: { get: getJSON, post: postJSON, save: saveCheck, flush: flushQueue, who, date: batchDate },
+           util: { fileToJpeg, beep, wakeLock, esc, fmtQty, isVisual, isScanned, isSub, isComplete, isException },
            _upcMatch: upcMatch, _simScan: code => onDecoded(code, null, "camera") };   // _ = test hooks
 })();
