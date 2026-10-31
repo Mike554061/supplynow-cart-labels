@@ -1,0 +1,102 @@
+/* SupplyNow Order Dash: batch picking (batch.js). Same palette and parts as verify.css. */
+
+/* Shop orders: Pick toggle, batch options, order selection */
+.bt-toggle{margin-bottom:10px}
+.bt-modes{display:flex;width:100%;margin-bottom:10px}
+.bt-modes button{flex:1;padding:9px 4px}
+.bt-slots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.bt-slots button{padding:8px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+  font-family:var(--mono);font-size:13px;font-weight:700;color:var(--dim)}
+.bt-slots button small{color:var(--faint);margin-left:3px}
+.bt-slots button.on{border-color:var(--frost);color:var(--frost)}
+.bt-rule{color:var(--dim);font-size:12.5px;line-height:1.45;margin:0 2px 12px}
+.bt-rule b{color:var(--txt)}
+.bt-size{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding-left:10px;font-family:var(--mono);flex:none}
+.bt-size b{font-size:16px;line-height:1}
+.bt-size span{font-size:9px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.bt-size em{font-style:normal;font-size:12px;color:var(--frost);margin-top:3px}
+.bt-foot button:disabled{opacity:.5}
+#screenList:has(.bt-foot) #closeOutBtn,#screenList:has(.bt-foot) #rsNote{display:none}
+#app:has(#screenList:not(.hidden) .bt-foot) .livefab{bottom:92px}   /* above Start batch pick, like the labels bar */
+.bt-resume{display:flex;align-items:center;gap:8px;background:#0f2e2a;border:1px solid #1d5b54;border-radius:13px;padding:11px 12px;margin-bottom:12px}
+.bt-resume .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.bt-resume .t b{color:var(--frost);font-size:14px}
+.bt-resume .t span{color:var(--dim);font-size:12px;line-height:1.4}
+.bt-resume button{padding:9px 12px;border-radius:10px;border:1px solid var(--line);font-weight:800;font-size:13px;color:var(--dim)}
+.bt-resume button.go{background:var(--frost);border-color:var(--frost);color:#04201d}
+
+/* order letters: A, B, C... in each order's color */
+.bt-tag{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 4px;border-radius:6px;
+  background:var(--c);color:#06121a;font:900 12px/1 var(--mono);flex:none;vertical-align:middle}
+.bt-tag.big{min-width:40px;height:40px;border-radius:11px;font-size:20px}
+
+/* batch screens */
+body.batching .livefab{display:none}
+.bt-tabs{display:flex;width:100%;margin:0 0 12px}
+.bt-tabs button{flex:1;padding:10px 6px}
+.bt-tabs b{font-family:var(--mono);margin-left:3px}
+.bt-legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin:12px 2px 4px;font-size:12px;color:var(--dim)}
+.bt-legend span{display:inline-flex;align-items:center;gap:5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-err{background:#2a1414;border:1px solid #6b2a2a;border-radius:13px;padding:11px 12px;margin:10px 0;font-size:13px;line-height:1.5;display:grid;gap:4px}
+.bt-err button{justify-self:start;margin-top:4px;padding:8px 14px;border-radius:9px;border:1px solid var(--line);font-weight:800}
+.vmsg + .vtools,.bt-err + .vtools{margin-top:12px}
+
+/* master pick list */
+.bt-split{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bt-split .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700}
+.bt-part{display:inline-flex;align-items:center;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px 7px 2px 2px}
+.bt-part b{font-family:var(--mono);font-size:13px}
+.bt-acts button{min-width:0;padding:0 9px}
+.lnacts button.out.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.lnacts button.sub.on{background:var(--more);border-color:var(--more);color:#06112b}
+.ln.complete.bt-m{opacity:.55}
+
+/* sort & check: one row per order */
+.bt-ord{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:12px;margin-bottom:9px}
+.bt-ord .meta{flex:1;min-width:0}
+.bt-ord .line2 span:last-child{white-space:nowrap}
+.bt-ord.done{opacity:.55}
+.bt-ord.done .acct{text-decoration:line-through}
+.bt-ord:disabled{opacity:.45}
+
+/* quick check: one line, large type */
+.bt-ck{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;margin-bottom:11px;
+  display:grid;gap:9px;position:relative;overflow:hidden}
+.bt-ck::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--line)}
+.bt-ck.st-ok::before{background:var(--ok)} .bt-ck.st-less::before,.bt-ck.st-sub::before{background:var(--less)}
+.bt-ck.st-more::before{background:var(--more)} .bt-ck.st-out::before{background:var(--bad)}
+.bt-ck.complete{opacity:.6}
+.bt-ck-top{display:flex;align-items:center;gap:8px}
+.bt-ck-top .bin{font:800 18px/1 var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+.bt-ck-item{display:flex;gap:12px;align-items:center}
+.bt-ck-item .lnimg{width:64px;height:64px}
+.bt-ck-desc{font-size:20px;font-weight:700;line-height:1.25}
+.bt-ck-ids{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--mono);font-size:15px;color:var(--dim)}
+.bt-ck-ids b{color:var(--txt);font-size:17px}
+.bt-ck-qty{display:flex;align-items:baseline;gap:10px}
+.bt-ck-qty .lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:800}
+.bt-ck-qty b{font-size:44px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.bt-ck-qty .u{font-size:16px;font-weight:800;color:var(--amber);text-transform:uppercase;letter-spacing:.06em}
+.bt-ck-acts{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px}
+.bt-ck-acts button{height:56px;border-radius:13px;border:1px solid var(--line);background:var(--panel2);font-weight:800;font-size:16px;color:var(--txt)}
+.bt-ck-acts .ok{font-size:19px}
+.bt-ck-acts .ok.on{background:var(--ok);border-color:var(--ok);color:#04201d}
+.bt-ck-acts .less.on{background:var(--less);border-color:var(--less);color:#1c1503}
+.bt-ck-acts .out.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.bt-ck-acts .sub.on{background:var(--more);border-color:var(--more);color:#06112b}
+.bt-ck .adj input{font-size:20px}
+.bt-subin{height:44px;border-radius:10px;border:1px solid var(--line);background:var(--ink);color:var(--txt);font-size:15px;padding:0 11px;font-family:inherit;width:100%}
+.bt-sug{display:flex;align-items:center;gap:10px;background:#2a2208;border:1px solid #5a4710;border-radius:11px;padding:9px 10px;
+  color:#F5D58A;font-size:14px;font-weight:700;line-height:1.35}
+.bt-sug span{flex:1}
+.bt-sug button{padding:9px 13px;border-radius:9px;background:var(--amber);color:#1c1503;font-weight:800;flex:none}
+.vstats.bt-3{grid-template-columns:repeat(3,1fr)}
+
+/* proof photo */
+.bt-proof{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;padding:12px;margin-top:4px}
+.bt-proof img{width:56px;height:56px;border-radius:9px;object-fit:cover;flex:none}
+.bt-proof .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.bt-proof .t span{color:var(--dim);font-size:12.5px;line-height:1.4}
+.bt-cam{padding:11px 14px;border-radius:11px;border:1px solid var(--frost);color:var(--frost);font-weight:800;font-size:14px;cursor:pointer;flex:none}
+.bt-cam input{display:none}
