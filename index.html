@@ -719,7 +719,8 @@ async function loadOrders(iso){
   if(CONFIG.FEED_URL){
     loadStatus="loading"; renderLocations();
     try{
-      let resp=await jsonp(CONFIG.FEED_URL);
+      // the Apps Script feed can take a while to wake up: one more, longer try before showing the error
+      let resp; try{ resp=await jsonp(CONFIG.FEED_URL, 25000); }catch(e){ resp=await jsonp(CONFIG.FEED_URL, 45000); }
       if(!resp||resp.ok===false) throw new Error((resp&&resp.error)||"bad feed");
       boardNote="";
       // date chip: a picked date the live board isn't on comes from the Next-Day Board
