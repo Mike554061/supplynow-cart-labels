@@ -52,9 +52,11 @@ const VERIFY = (() => {
     try {
       const m = location.hash.match(/(?:^#|&)k=([A-Za-z0-9_-]{20,})/);
       if (m) ls.set(KEY_KEY, m[1]);
+      const inv = location.hash.match(/(?:^#|&)i=([A-Za-z0-9_-]{16,64})/);   // one-time setup link
+      if (inv) redeem(inv[1]);
       const q = new URLSearchParams(location.search), v = q.get("verify");
       if (v === "on" || v === "off") ls.set(DEVICE_KEY, v);
-      if (m || v) {                       // keep the key out of the address bar and history
+      if (m || inv || v) {                // keep the key out of the address bar and history
         q.delete("verify");
         history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : ""));
       }
@@ -64,6 +66,16 @@ const VERIFY = (() => {
   if (PROD && ls.get(LEGACY_KEY, false))
     fetch(API + "health", { cache: "no-store" }).then(r => r.json())
       .then(r => { if (r && (r.features || []).includes("visual")) ls.set(LEGACY_KEY, false); }).catch(() => {});
+  // a one-time setup link (#i=<code>) is traded, once, for a key of this phone's own
+  async function redeem(code) {
+    let r = null;
+    try { r = await (await fetch(API + "health?redeem=" + encodeURIComponent(code), { cache: "no-store", headers: { "ngrok-skip-browser-warning": "1" } })).json(); } catch (e) {}
+    if (r && r.ok && r.key) {
+      ls.set(KEY_KEY, r.key); ls.set(DEVICE_KEY, "on");
+      alert("This phone is set up for Shop orders" + (r.label ? ` (${r.label})` : "") + ". Now tap Share → Add to Home Screen.");
+      if (typeof renderList === "function" && typeof state !== "undefined" && state.loc) renderList();
+    } else alert((r && r.error) || "Couldn't reach the order server to set up this phone. Open the link again in a minute.");
+  }
   function enabled() {
     if (!PROD) return true;
     const device = ls.get(DEVICE_KEY, "");
