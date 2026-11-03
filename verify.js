@@ -19,6 +19,7 @@
 const VERIFY = (() => {
   const CFG = Object.assign({ mode: "sandbox", api: "api/", rollout: "off" }, window.CART_VERIFY || {});
   const PROD = CFG.mode === "prod";
+  const OPEN = !!CFG.open;        // anyone with the app link, no device key (server runs CART_OPEN=1)
   const KEYLESS = !!CFG.keyless;   // Cloudflare copy: Access gates the page, and its /cart/ proxy adds the key
   const API = CFG.api;
   const SRC_KEY = "sn_dev_source", WHO_KEY = "sn_verify_who", QUEUE_KEY = "sn_verify_queue";
@@ -77,7 +78,7 @@ const VERIFY = (() => {
     } else alert((r && r.error) || "Couldn't reach the order server to set up this phone. Open the link again in a minute.");
   }
   function enabled() {
-    if (!PROD) return true;
+    if (!PROD || OPEN) return true;
     const device = ls.get(DEVICE_KEY, "");
     return (KEYLESS || !!ls.get(KEY_KEY, "")) && (device === "on" || (CFG.rollout === "on" && device !== "off"));
   }
