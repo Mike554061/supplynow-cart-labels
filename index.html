@@ -584,6 +584,7 @@ let loadStatus = "idle";     // idle | loading | ok | error | mock
 let loadedDate = "";         // MM/DD/YYYY the current Routing_Date batch is for
 let datePicked = false;      // true once someone changes the date chip; until then it follows the live board
 let boardNote = "";          // line above the depot tiles: next-day board, or no board for the picked date
+let loadErr = "";            // why the feed failed, shown under the error
 
 // stamp a unique key on every order — order numbers can repeat / be blank across rows
 function stampUids(map){
@@ -697,6 +698,14 @@ function buildFromFeed(resp){
   }));
 }
 
+// plain words for why the feed failed (shown under the error so it can be fixed)
+function feedErr(e){
+  const m=String((e&&e.message)||e||"");
+  if(m==="timeout") return "The order feed (Google Apps Script) didn't answer in time (tried twice).";
+  if(m==="network") return "The order feed (Google Apps Script) wouldn't load on this phone.";
+  return "Order feed said: "+m;
+}
+
 // plain JSONP fetch (for the locked Apps Script endpoint)
 function jsonp(url, timeoutMs=20000){
   return new Promise((resolve,reject)=>{
@@ -719,7 +728,8 @@ async function loadOrders(iso){
   if(CONFIG.FEED_URL){
     loadStatus="loading"; renderLocations();
     try{
-      let resp=await jsonp(CONFIG.FEED_URL);
+      // the Apps Script feed can take a while to wake up: one more, longer try before showing the error
+      let resp; try{ resp=await jsonp(CONFIG.FEED_URL, 25000); }catch(e){ resp=await jsonp(CONFIG.FEED_URL, 45000); }
       if(!resp||resp.ok===false) throw new Error((resp&&resp.error)||"bad feed");
       boardNote="";
       // date chip: a picked date the live board isn't on comes from the Next-Day Board
@@ -737,7 +747,7 @@ async function loadOrders(iso){
         }
       }
       buildFromFeed(resp); loadStatus="ok";
-    }catch(e){ ORDERS={}; LOCATIONS=[]; loadStatus="error"; console.warn("feed failed:",e); }
+    }catch(e){ ORDERS={}; LOCATIONS=[]; loadStatus="error"; loadErr=feedErr(e); console.warn("feed failed:",e); }
     return;
   }
   // 2) direct sheet read via gviz (only while the sheet is still link-readable)
@@ -832,6 +842,7 @@ function renderLocations(){
   }
   if(loadStatus==="error"){
     g.innerHTML=`<div class="loadstate err">Couldn't reach the live order feed.<br>
+      ${loadErr?`<span style="color:var(--faint);font-size:12px">${escapeHtml(loadErr)}</span><br>`:""}
       <button class="retry" onclick="reload()">Retry</button></div>`;return;
   }
   if(LOCATIONS.length===0 && boardNote){
