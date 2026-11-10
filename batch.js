@@ -571,6 +571,8 @@ const BATCH = (() => {
     if (S.view === "check" && S.cur) renderCheck(host);
     else if (S.view === "sort" || S.view === "check") { S.view = "sort"; renderSort(host); }
     else renderPick(host);
+    if (S.b.ids.some(id => S.data[id] && S.data[id].backup) && !host.querySelector(".vbackup"))   // items came from the order sheets
+      host.insertAdjacentHTML("afterbegin", `<div class="vmsg vbackup">Backup lists from the order sheets: the order server isn't answering. Checks are saved on this phone. Marking an order picked still tells dispatch.</div>`);
     window.scrollTo(0, y);
   }
   function setFilter(f) { S.filter = f; render(); }

@@ -205,3 +205,6 @@ body.verifying .livefab{display:none}
 
 /* unit / case under each quantity: the app's yellow (same as the substitution note) */
 .lnqty span{color:var(--amber)}
+
+/* backup: items from the order's Drive sheet while the order server is down */
+.vmsg.vbackup{margin:10px 0;padding:10px 14px;border:1px solid var(--amber);background:rgba(224,165,38,.12);color:var(--amber);text-align:left;font-size:13px}

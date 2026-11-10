@@ -25,6 +25,8 @@ const VERIFY = (() => {
   const SRC_KEY = "sn_dev_source", WHO_KEY = "sn_verify_who", QUEUE_KEY = "sn_verify_queue";
   const KEY_KEY = "sn_verify_key", DEVICE_KEY = "sn_verify_device";
   const LEGACY_KEY = "sn_verify_legacy_visual";   // the server predates scan_status "visual" (batch quick check)
+  const LINES_FEED = CFG.lines_feed || "";        // Google backup: an order's items from its Drive sheet when the mini can't answer
+  const BACKUP_KEY = "sn_backup_checks";          // checks on backup orders stay on this phone (they never reach the mini)
   const SCANNER_LIB = "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
   const S = { cur: null, summary: {}, summaryAt: {}, scan: null, scanner: null, fileScanner: null,
               lastCode: "", lastAt: 0, log: [], photos: {} };
@@ -40,10 +42,50 @@ const VERIFY = (() => {
   function headers() {
     return PROD && !KEYLESS ? { "X-Cart-Key": ls.get(KEY_KEY, ""), "ngrok-skip-browser-warning": "1" } : {};
   }
-  async function getJSON(path) { const r = await fetch(API + path, { cache: "no-store", headers: headers() }); return r.json(); }
+  async function getJSON(path) {
+    let r = null, err = null;
+    try { r = await (await fetch(API + path, { cache: "no-store", headers: headers() })).json(); } catch (e) { err = e; }
+    if (LINES_FEED && /^order\?/.test(path) && (err || !r || r.ok === false)) {   // the mini is down or has no lines yet
+      const b = await backupOrder(new URLSearchParams(path.slice(6)).get("id")).catch(() => null);
+      if (b) return b;
+    }
+    if (err) throw err;
+    return r;
+  }
   async function postJSON(path, body) {
+    if ((path === "verify" || path === "order_done") && body && backup.has(String(body.order))) return backupSave(path, body);
     const r = await fetch(API + path, { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, headers()), body: JSON.stringify(body) });
     return r.json();
+  }
+
+  /* ---------- backup: order lines from the order's Drive sheet (Google), checks kept on the phone ---------- */
+  const backup = new Set();                       // order numbers opened from the backup this session
+  function backupState() {
+    const day = batchDate(), st = ls.get(BACKUP_KEY, null);
+    return st && st.day === day ? st : { day, orders: {} };
+  }
+  async function backupOrder(id) {
+    if (!id || typeof jsonp !== "function") return null;
+    const r = await jsonp(LINES_FEED + "?id=" + encodeURIComponent(id), 25000);
+    if (!r || !r.ok || !r.lines || !r.lines.length) return null;
+    const num = String(r.order.order_number), mine = backupState().orders[num] || {};
+    backup.add(num);
+    return { ok: true, backup: true, lines: r.lines, checks: mine.checks || {}, done: mine.done || null,
+             order: Object.assign({ city: "", total: 0, date: batchDate(), ingested_at: "", contact: "", store_key: "" }, r.order,
+                                  { startMin: Number(r.order.startMin) || 0 }) };
+  }
+  function backupSave(path, body) {
+    const st = backupState(), o = (st.orders[String(body.order)] = st.orders[String(body.order)] || { checks: {} });
+    let out = { ok: true };
+    if (path === "order_done") o.done = body.undo ? null : { done_at: new Date().toISOString(), who: body.who || "", summary: body.summary || null };
+    else {
+      const c = Object.assign({}, o.checks[String(body.line)] || {}, body, { updated_at: new Date().toISOString() });
+      delete c.order; delete c.line; delete c.photo_b64;   // a photo stays on screen only; the phone can't hold many
+      o.checks[String(body.line)] = c;
+      out = { ok: true, check: c };
+    }
+    ls.set(BACKUP_KEY, st);
+    return out;
   }
   function source() { return PROD ? "live" : ls.get(SRC_KEY, "live"); }
 
@@ -392,7 +434,8 @@ const VERIFY = (() => {
     const d = S.cur.data;
     const head = `<div class="vhead"><button class="back" onclick="VERIFY.back()">‹ Back</button>
       <div><div class="eyebrow" style="margin:0 0 2px">Pick order</div><div class="ltitle">${esc(o.acct)}</div>
-      <div class="lcount">${esc(o.win || "—")} · ${esc(o.type.toUpperCase())} · ${esc(o._tag || "")}${d ? ` · #${esc(d.order.order_number)}` : ""}</div></div></div>`;
+      <div class="lcount">${esc(o.win || "—")} · ${esc(o.type.toUpperCase())} · ${esc(o._tag || "")}${d ? ` · #${esc(d.order.order_number)}` : ""}</div></div></div>`
+      + (d && d.backup ? `<div class="vmsg vbackup">Backup list from the order sheet: the order server isn't answering. Your checks are saved on this phone. Marking the order picked still tells dispatch.</div>` : "");
     if (!d) {
       host.innerHTML = head + `<div class="vmsg">${S.cur.err ? esc(S.cur.err) : "Pulling the order lines…"}</div>`;
       return;
