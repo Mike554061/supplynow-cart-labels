@@ -1,0 +1,6 @@
+.claude
+.github
+*.py
+*.sh
+render.yaml
+README.md
