@@ -95,6 +95,8 @@ const BATCH = (() => {
     h += `<div class="seg bt-modes">${MODES.map(([k, t]) => `<button class="${S.mode === k ? "on" : ""}" onclick="BATCH.setMode('${k}')">${t}</button>`).join("")}</div>`;
     if (S.mode === "slot") h += `<div class="bt-slots">${sl.map(([k, c], i) =>
       `<button class="${S.slot === k ? "on" : ""}" onclick="BATCH.setSlot(${i})">${esc(k)} <small>${c}</small></button>`).join("")}</div>`;
+    h += `<div class="bt-printbar"><button ${n ? "" : "disabled"} onclick="BATCH.printOpen()">⎙ Print batch · ${n} order${n === 1 ? "" : "s"}</button>
+      <span>Pick list + order sheets, letter PDF</span></div>`;
     h += `<p class="bt-rule">${ruleText()} <b>${C.length}</b> of ${all.length} open order${all.length === 1 ? "" : "s"} match. Tap an order to leave it out.</p>`;
     h += C.length ? C.map(selCard).join("") : `<div class="vmsg">No open orders match. Try another option.</div>`;
     h += `<div class="vfoot bt-foot"><button class="${n ? "ready" : ""}" ${n ? "" : "disabled"} onclick="BATCH.start()">Start batch pick · ${n} order${n === 1 ? "" : "s"}</button></div>`;
@@ -187,10 +189,11 @@ const BATCH = (() => {
     const id = l.item ? "i" + l.item : l.upc ? "u" + digits(l.upc) : "d" + String(l.desc || "").toLowerCase();
     return id + "|" + unitOf(l).toLowerCase();
   }
-  function master() {
+  function master() { return masterOf(S.b.ids, S.data); }
+  function masterOf(ids, data) {
     const m = new Map();
-    S.b.ids.forEach((id, oi) => {
-      const d = S.data[id];
+    ids.forEach((id, oi) => {
+      const d = data[id];
       if (!d || !d.lines) return;
       d.lines.forEach(l => {
         const k = keyOf(l);
@@ -416,7 +419,7 @@ const BATCH = (() => {
     const b = S.b;
     return `<div class="vhead"><button class="back" onclick="BATCH.back()">‹ ${S.view === "check" ? "Orders" : "Back"}</button>
       <div><div class="eyebrow" style="margin:0 0 2px">Batch pick · ${esc(modeLabel(b))}</div><div class="ltitle">${title}</div>
-      <div class="lcount">${sub}</div></div></div>`;
+      <div class="lcount">${sub}</div></div>${S.view === "check" ? "" : `<button class="bt-printhd" onclick="BATCH.printOpen(true)">⎙ Print</button>`}</div>`;
   }
   function tabs(st) {
     const done = Object.keys(S.b.done).length;
@@ -576,8 +579,166 @@ const BATCH = (() => {
   function setFilter(f) { S.filter = f; render(); }
   function cancelConfirm() { S.confirm = false; render(); }
 
+  /* ---------- batch printing: the pick list (bin order) + one order sheet per customer, letter-size PDF ----------
+     Same flow as batch picking: choose the batch, tap Print. Built like the cart labels: each page is
+     drawn on screen, rasterized, and saved as one PDF (8.5 x 11 in, portrait). */
+  const PW = 816, PH = 1056, PAD = 36;                 // a letter page at 96 px per inch
+  const P = { on: false, ids: [], data: {}, loc: "", mode: "", lists: true, sheets: true, busy: false };
+  const letter = i => i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(64 + Math.floor(i / 26)) + String.fromCharCode(65 + i % 26);
+  const clip = (t, n) => { t = String(t || ""); return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t; };
+  const usd = n => "$" + (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const upcHtml = u => { u = String(u || ""); return u ? `${esc(u.slice(0, -5))}<b>${esc(u.slice(-5))}</b>` : "—"; };
+  function boardDay() {
+    const m = day().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    return m ? new Date(+m[3], +m[1] - 1, +m[2]).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : day();
+  }
+
+  async function printOpen(fromBatch) {
+    if (!ready()) return;
+    const active = fromBatch && S.b;
+    P.ids = active ? S.b.ids.slice() : chosen().map(o => o.id);
+    if (!P.ids.length) return;
+    P.loc = active ? S.b.loc : state.loc;
+    P.mode = active ? modeLabel(S.b) : modeLabel({ mode: S.mode, slot: S.slot });
+    P.data = {};
+    P.ids.forEach(id => { if (S.b && S.data[id] && S.data[id].lines) P.data[id] = S.data[id]; });   // already pulled for the batch
+    P.on = true; P.busy = false;
+    printRender();
+    const todo = P.ids.filter(id => !P.data[id]);
+    let i = 0;
+    const worker = async () => {
+      while (i < todo.length && P.on) {
+        const id = todo[i++];
+        try {
+          const r = await net().get(`order?id=${encodeURIComponent(id)}&date=${encodeURIComponent(day())}`);
+          P.data[id] = r.ok ? r : { err: r.detail || r.error || "Couldn't load this order." };
+        } catch (e) { P.data[id] = { err: "Couldn't reach the order server." }; }
+        printRender();
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+  }
+  function printClose() { P.on = false; const n = el("btPrint"); if (n) n.remove(); document.body.classList.remove("bt-printing"); }
+  function printToggle(k) { P[k] = !P[k]; if (!P.lists && !P.sheets) P[k === "lists" ? "sheets" : "lists"] = true; printRender(); }
+
+  const ordOf = id => (ORDERS[P.loc] || []).find(o => o.id === id) || { acct: id, win: "", type: "", cases: "", amount: 0 };
+  function pageShell(inner, n, total, foot) {
+    return `<div class="bp-page"><div class="bp-in">${inner}</div>
+      <div class="bp-foot"><span class="ck"></span>${foot}<span class="pg">Page ${n} of ${total}</span></div></div>`;
+  }
+  function hdrBand(left, right) {
+    return `<div class="bp-hdr"><div class="t">${left}</div><div class="r">${right}</div></div>`;
+  }
+
+  // pick list: every item in the batch once, in bin order, with how many go to each order
+  function pickPages() {
+    const M = masterOf(P.ids, P.data);
+    const units = Math.round(M.reduce((t, e) => t + e.total, 0) * 100) / 100;
+    const legend = `<div class="bp-legend">${P.ids.map((id, i) => {
+      const o = ordOf(id);
+      return `<span><i>${letter(i)}</i>${esc(clip(o.acct, 30))} <em>${esc(o.win || "")} ${esc((o.type || "").slice(0, 1))}</em></span>`; }).join("")}</div>`;
+    const top = hdrBand(`PICK LIST`, `<div class="w">${esc(P.mode)}</div><div class="dt">${esc(boardDay())}</div>`) +
+      `<div class="bp-meta"><b>${esc(locName ? locName() : P.loc)}</b><span>${P.ids.length} orders</span><span>${M.length} items</span><span>${units} units</span><span>bin order · like items combined</span></div>` + legend;
+    const th = `<div class="bp-row bp-th pk"><span></span><span>Bin</span><span>Qty</span><span>Item</span><span>Item #</span><span>UPC</span><span>For</span></div>`;
+    const row = e => {
+      const parts = e.parts.slice().sort((a, b) => a.oi - b.oi);
+      const shown = parts.slice(0, 9).map(pt => `<i>${letter(pt.oi)}<b>${fmt(pt.qty)}</b></i>`).join("") + (parts.length > 9 ? `<i>+${parts.length - 9}</i>` : "");
+      const note = e.notes.length ? `<div class="nt">${esc(clip(e.notes.map(n => letter(P.ids.indexOf(n.id)) + ": " + n.note).join(" · "), 70))}</div>` : "";
+      return `<div class="bp-row pk"><span class="box"></span><span class="bin">${esc(e.bin || "—")}</span>
+        <span class="q"><b>${fmt(e.total)}</b><small>${esc(e.unit)}</small></span>
+        <span class="d">${esc(clip(e.desc, note ? 46 : 84))}${note}</span><span class="m">${esc(e.item || "—")}</span>
+        <span class="m">${upcHtml(e.upc)}</span><span class="for">${shown}</span></div>`;
+    };
+    const missing = P.ids.filter(id => P.data[id] && P.data[id].err);
+    const warn = missing.length ? `<div class="bp-warn">Not on this list (no line items yet): ${missing.map(id => letter(P.ids.indexOf(id)) + " " + esc(clip(ordOf(id).acct, 24))).join(", ")}. Pick those from their order paperwork.</div>` : "";
+    return paginate(M.map(row), top + warn + th, hdrBand(`PICK LIST <small>cont.</small>`, `<div class="dt">${esc(boardDay())}</div>`) + th,
+      Math.ceil(P.ids.length / 3) * 19 + (warn ? 34 : 0) + 122, 46, "PICKED BY ____________ &nbsp; CHECKED BY ____________", M.length ? "" : `<div class="bp-empty">No line items loaded for this batch.</div>`);
+  }
+
+  // one sheet per customer, the order's lines in bin order, with room to write shorts and subs
+  function sheetPages(id) {
+    const i = P.ids.indexOf(id), o = ordOf(id), d = P.data[id] || {};
+    const lines = (d.lines || []).slice().sort((a, b) => (binNum(a) - binNum(b)) || (a.line - b.line));
+    const units = Math.round(lines.reduce((t, l) => t + (Number(l.qty) || 0), 0) * 100) / 100;
+    const type = (o.type || "").toUpperCase() || "ORDER";
+    const top = hdrBand(`<span class="tag">${letter(i)}</span>${esc(type)}`, `<div class="w">${esc(o.win || "")}</div><div class="dt">${esc(boardDay())}</div>`) +
+      `<div class="bp-cust"><div class="a">${esc(clip(o.acct, 44))}</div><div class="c">${esc((o.city || "") + (o.city ? " · " : "") + (locName ? locName() : P.loc))}</div>
+        <div class="bp-fields"><div><span>Order #</span><b>${esc(id)}</b></div><div><span>Lines</span><b>${lines.length || "—"}</b></div>
+          <div><span>Units</span><b>${lines.length ? units : "—"}</b></div><div><span>Pieces</span><b>${esc(o.cases || "—")}</b></div>
+          <div><span>Amount</span><b>${usd(o.amount)}</b></div><div><span>Batch</span><b>${esc(P.mode)} · ${letter(i)} of ${P.ids.length}</b></div></div></div>`;
+    const th = `<div class="bp-row bp-th os"><span></span><span>Bin</span><span>Qty</span><span>Item</span><span>Item #</span><span>UPC</span><span>Short · Out · Sub</span></div>`;
+    const row = l => `<div class="bp-row os"><span class="box"></span><span class="bin">${esc(l.bin || "—")}</span>
+      <span class="q"><b>${fmt(l.qty)}</b><small>${esc(unitOf(l))}</small></span>
+      <span class="d">${esc(clip(l.desc, l.note || l.addon ? 48 : 88))}${l.note || l.addon ? `<div class="nt">${esc(clip(l.addon ? "ADD-ON" : l.note, 60))}</div>` : ""}</span>
+      <span class="m">${esc(l.item || "—")}</span><span class="m">${upcHtml(l.upc)}</span><span class="wr"></span></div>`;
+    const blank = `<div class="bp-row os"><span class="box"></span><span></span><span></span><span class="ln"></span><span class="ln"></span><span class="ln"></span><span class="wr"></span></div>`;
+    const empty = d.err ? `<div class="bp-empty">No line items loaded: ${esc(d.err)}<br>Pick this order from its order paperwork and write the items in below.</div>` + blank.repeat(14) : "";
+    return paginate(lines.map(row), top + th, hdrBand(`<span class="tag">${letter(i)}</span>${esc(clip(o.acct, 30))} <small>cont.</small>`, `<div class="dt">${esc(boardDay())}</div>`) + th,
+      190, 42, "REVIEW FINAL ORDER PAPERWORK BEFORE LEAVING &nbsp;·&nbsp; PICKED BY ________ &nbsp; CHECKED BY ________", empty);
+  }
+
+  // fixed row heights, so a page always holds a known number of rows
+  function paginate(rows, firstTop, nextTop, firstTopH, rowH, foot, emptyHtml) {
+    const body = PH - 2 * PAD - 40;                    // 40: the footer band
+    const per1 = Math.max(1, Math.floor((body - firstTopH - 26) / rowH)), perN = Math.floor((body - 70 - 26) / rowH);
+    const chunks = [rows.slice(0, per1)];
+    for (let k = per1; k < rows.length; k += perN) chunks.push(rows.slice(k, k + perN));
+    return chunks.map((c, k) => ({ html: (k ? nextTop : firstTop) + (c.length ? c.join("") : (emptyHtml || "")), foot }));
+  }
+
+  function printPages() {
+    const out = [];
+    if (P.lists) out.push(pickPages());
+    if (P.sheets) P.ids.forEach(id => out.push(sheetPages(id)));
+    const flat = [];
+    out.forEach(group => group.forEach((pg, k) => flat.push(Object.assign({ part: k + 1, parts: group.length }, pg))));
+    return flat.map((pg, k) => pageShell(pg.html, k + 1, flat.length, pg.foot));
+  }
+
+  function printRender() {
+    if (!P.on) return;
+    let host = el("btPrint");
+    if (!host) { host = document.createElement("div"); host.id = "btPrint"; document.body.appendChild(host); document.body.classList.add("bt-printing"); }
+    const got = P.ids.filter(id => P.data[id]).length, loading = got < P.ids.length;
+    const pages = loading ? [] : printPages();
+    const scale = Math.min(1, (Math.min(window.innerWidth, 860) - 28) / PW);
+    host.innerHTML = `<div class="bp-bar"><button class="back" onclick="BATCH.printClose()">‹ Back</button>
+        <div class="tt"><b>Print batch</b><span>${esc(P.mode)} · ${P.ids.length} order${P.ids.length === 1 ? "" : "s"}${loading ? "" : ` · ${pages.length} page${pages.length === 1 ? "" : "s"}`} · letter</span></div></div>
+      <div class="bp-opts"><button class="${P.lists ? "on" : ""}" onclick="BATCH.printToggle('lists')">${P.lists ? "✓ " : ""}Pick list</button>
+        <button class="${P.sheets ? "on" : ""}" onclick="BATCH.printToggle('sheets')">${P.sheets ? "✓ " : ""}Order sheets</button>
+        <button id="bpPdf" class="pdf" ${loading ? "disabled" : ""} onclick="BATCH.printPDF()">⎙ Save letter PDF</button></div>
+      ${loading ? `<div class="vmsg">Pulling order lines… ${got} of ${P.ids.length} orders</div>` :
+        pages.map(p => `<div class="bp-wrap" style="width:${PW * scale}px;height:${PH * scale}px"><div class="bp-scale" style="transform:scale(${scale})">${p}</div></div>`).join("")}`;
+  }
+
+  async function printPDF() {
+    if (P.busy) return;
+    if (!window.jspdf || !window.html2canvas) { alert("PDF tools still loading. Give it a second and tap again."); return; }
+    const pages = [...document.querySelectorAll("#btPrint .bp-page")];
+    if (!pages.length) return;
+    P.busy = true;
+    const btn = el("bpPdf"), orig = btn.innerHTML; btn.disabled = true;
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "portrait", unit: "in", format: "letter", compress: true });
+      for (let k = 0; k < pages.length; k++) {
+        btn.textContent = `Building ${k + 1} of ${pages.length}…`;
+        const sc = pages[k].parentNode, prev = sc.style.transform; sc.style.transform = "none";   // capture at full size
+        const canvas = await html2canvas(pages[k], { scale: 2, backgroundColor: "#ffffff", width: PW, height: PH,
+          windowWidth: 1200, windowHeight: 1400, logging: false, useCORS: true });
+        sc.style.transform = prev;
+        if (k) doc.addPage("letter", "portrait");
+        doc.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 8.5, 11);
+      }
+      const stamp = day().replace(/[^0-9]/g, ""), where = String((locName && locName()) || P.loc || "").replace(/[^A-Za-z]/g, "");
+      doc.save(`SupplyNow-BatchPick-${where}${stamp ? "-" + stamp : ""}.pdf`);
+    } catch (e) {
+      console.error("batch PDF failed:", e); alert("Couldn't build the PDF: " + ((e && e.message) || e));
+    } finally { btn.disabled = false; btn.innerHTML = orig; P.busy = false; }
+  }
+
   return { listView, setOn, setMode, setSlot, toggle, start, resume, end, back, tab, retry, setFilter,
            mOk, mOut, mAdj, openCheck, cOk, cOut, cAdj, cSug, adjStep, adjInput, adjSub, adjReason, adjCancel, adjSave,
-           proofPick, markPicked, undoPicked, cancelConfirm, finish, render,
+           proofPick, markPicked, undoPicked, cancelConfirm, finish, render, printOpen, printClose, printToggle, printPDF,
            _S: S, _master: () => master(), _allocation: () => allocation() };   // _ = test hooks
 })();
